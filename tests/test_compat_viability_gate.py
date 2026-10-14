@@ -3,24 +3,24 @@
 
 Two repositories read the same private ledger file:
 
-  * **bounty-economics** (this repo) owns the schema: @@@schemas/ledger.schema.json@@@,
+  * **bounty-economics** (this repo) owns the schema: ``schemas/ledger.schema.json``,
     plus the validator and the taxonomies.
-  * **viability-gate** (@@@../viability-gate@@@) owns the CLI. Its @@@vg init@@@ scaffolds a
-    ledger, and its @@@LedgerEntry@@@ model deserializes one.
+  * **viability-gate** (``../viability-gate``) owns the CLI. Its ``vg init`` scaffolds a
+    ledger, and its ``LedgerEntry`` model deserializes one.
 
 Nothing enforces that those two agree except this file. The contract is checked at
 a **pinned tag** of the sibling, so a change over there cannot silently break the
 format here without failing a build:
 
-  * forward — @@@vg init@@@ output, once filled in, must satisfy this repo's schema.
-  * reverse — a ledger this repo accepts must be readable by @@@vg@@@.
+  * forward — ``vg init`` output, once filled in, must satisfy this repo's schema.
+  * reverse — a ledger this repo accepts must be readable by ``vg``.
 
 It SKIPS, with a specific reason, rather than failing, when the sibling checkout
-is absent, when the pinned tag has not been published, or when @@@git@@@ / @@@cargo@@@ is
+is absent, when the pinned tag has not been published, or when ``git`` / ``cargo`` is
 unavailable. A sibling repository that is merely *absent* is not a defect in this
 repo, and a red build for it would train people to ignore the signal.
 
-The pin lives in exactly one place: @@@PINNED_VG_TAG@@@ below.
+The pin lives in exactly one place: ``PINNED_VG_TAG`` below.
 
 Run:
     python -m pytest tests/test_compat_viability_gate.py -q
@@ -29,6 +29,7 @@ Run:
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -51,11 +52,12 @@ from validate import (  # noqa: E402
 # ---------------------------------------------------------------- the pin
 
 # The single source of truth for the cross-repo pin. Bump it when viability-gate
-# publishes a tag, and this test starts asserting again.
-PINNED_VG_TAG = "v0.1.0"
+# publishes a tag that changes the ledger format or `vg init`.
+PINNED_VG_TAG = "v0.4.0"
 
 # The sibling checkout, relative to this repo. Both live under the same parent.
-SIBLING = ROOT.parent / "viability-gate"
+# VG_SIBLING overrides it, for a checkout kept under a different folder name.
+SIBLING = Path(os.environ.get("VG_SIBLING") or ROOT.parent / "viability-gate").resolve()
 
 TIERS, CLAUSES = load_taxonomies()
 SCHEMA = json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
@@ -91,7 +93,7 @@ requires_sibling = pytest.mark.skipif(
 def vg_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Extract the sibling at the pinned tag, build it, and return the binary.
 
-    @@@git archive@@@ is used rather than @@@git worktree@@@ so that building the pinned
+    ``git archive`` is used rather than ``git worktree`` so that building the pinned
     revision touches nothing inside the sibling repository - it may be under
     concurrent edit, and a test must not add state to somebody else's checkout.
     """
@@ -225,7 +227,7 @@ def test_vg_init_offers_no_shape_or_class_we_do_not_have(vg_binary: Path, tmp_pa
     """Every vocabulary value the scaffold offers must exist in our taxonomies.
 
     This is the direction that catches a real divergence: viability-gate adding a
-    tier shape, or re-offering the removed @@@any@@@, that this repo's schema would
+    tier shape, or re-offering the removed ``any``, that this repo's schema would
     reject.
     """
     target = tmp_path / "target"
@@ -252,7 +254,7 @@ def test_vg_init_offers_no_shape_or_class_we_do_not_have(vg_binary: Path, tmp_pa
 def test_our_example_ledger_is_readable_by_vg(vg_binary: Path, tmp_path: Path):
     """The reverse direction: what we accept, vg must be able to parse.
 
-    @@@vg gates@@@ exits 2 on a parse failure and otherwise reports gate status, so
+    ``vg gates`` exits 2 on a parse failure and otherwise reports gate status, so
     exit code 2 is the signal. Any other code means the ledger was read.
     """
     example = ROOT / "examples" / "tier-shapes.example.yaml"
@@ -274,7 +276,7 @@ def test_our_example_ledger_is_readable_by_vg(vg_binary: Path, tmp_path: Path):
 def test_vg_ignores_our_additive_fields_without_failing(vg_binary: Path, tmp_path: Path):
     """Additive fields must not break the older reader.
 
-    @@@floor_status@@@ and @@@schema_version@@@ are fields viability-gate's model does not
+    ``floor_status`` and ``schema_version`` are fields viability-gate's model does not
     read. The contract is that they are additive: an old reader must ignore them,
     not reject them. A ledger that fails here means the two repos have diverged.
     """

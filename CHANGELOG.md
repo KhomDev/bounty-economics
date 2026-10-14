@@ -26,7 +26,33 @@ The tree itself is unchanged except for the tripwire fix recorded here.
   both checks and by the fixtures, so the scan CI runs and the scan the tests run
   cannot drift apart.
 
-## [Unreleased] — 0.2.0
+## [Unreleased]
+
+## [0.2.0] — 2026-10-14
+
+The first tagged release in this repository. The ledger schema is still v1. It
+contains everything below, the history-reset fix above, and these release fixes:
+
+### Release fixes (2026-10-14)
+
+- **The cross-repo compatibility test never ran.** It was pinned to
+  viability-gate `v0.1.0`, a tag that does not exist, so every run skipped. It is
+  now pinned to `v0.4.0`, and all nine assertions pass at that tag, in both
+  directions. CI clones viability-gate with its tags rather than by
+  `--branch <tag>`, so the pin is declared only in
+  `tests/test_compat_viability_gate.py`. A failed clone is now a red build
+  instead of a silent skip. `VG_SIBLING` points the test at a checkout under
+  another folder name.
+- **GitHub could not identify the licence.** `LICENSE` carried a "No third-party
+  data" section after the MIT text, which defeats licence detection. `LICENSE` is
+  now the MIT text alone, and the paragraph moved, unchanged, to the README's
+  License section.
+- **Mangled backticks**: eleven code spans in the compat test's docstrings were
+  wrapped in triple at-signs instead of double backticks, and a code span in
+  `CONTRIBUTING.md` had two stray backticks.
+- **Added `scripts/check_markdown.py`** to CI (mangled or unbalanced fences, and
+  any README pin that differs from the version), plus **Dependabot** for pip and
+  GitHub Actions. CI moved to `actions/checkout@v7` and `actions/setup-python@v7`.
 
 ### Fixed
 
@@ -93,10 +119,13 @@ If you wrote `tier_shape: low_and_above` for a program whose page simply never m
 floor, that entry is now an **error**: set `tier_shape: unknown` and
 `floor_status: unstated` until you find the reward table.
 
-## [0.1.0] — 2026-10-08
+## 0.1.0 — 2026-10-08 (untagged; predates the history reset)
 
 - Payout-tier and exclusion-clause taxonomies, shipped as data under `data/`.
 - `schemas/ledger.schema.json` and `scripts/validate.py`, with a worked example and a test
   suite.
 - The `any` tier shape was removed: a program documenting no severity floor is `low_and_above`.
   (Superseded — see the unstated-floor fix above.)
+
+[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/KhomDev/bounty-economics/releases/tag/v0.2.0

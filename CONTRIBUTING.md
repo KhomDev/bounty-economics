@@ -52,7 +52,7 @@ drifted once.
 
 ## Changing the ledger format
 
-The top level stays a **list** of entries. ```vg` ([viability-gate](https://github.com/KhomDev/viability-gate))
+The top level stays a **list** of entries. `vg` ([viability-gate](https://github.com/KhomDev/viability-gate))
 deserializes the file as a sequence, so turning the root into a mapping breaks a tool that reads
 the same ledger.
 

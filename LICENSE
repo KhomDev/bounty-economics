@@ -19,12 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-## No third-party data
-
-This repository contains methodology, schemas and tooling only. It ships no
-program names, no chains, no reward tables and no scope text from any third
-party. Program terms are the property of their programs; this repository grants
-no rights over them and reproduces none of them.
