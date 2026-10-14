@@ -16,9 +16,9 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -57,6 +57,10 @@ jobs:
       # Every relative link in every document must resolve.
       - name: Links resolve
         run: python scripts/check_links.py
+
+      # Mangled code fences, and a README pin that differs from the version.
+      - name: Markdown renders and any pinned tag is the version
+        run: python scripts/check_markdown.py
 
       # check_generic.py guards the shipped DATA. This guards the whole
       # repository, including prose and scripts, against mojibake, an identity
@@ -98,29 +102,28 @@ jobs:
     # a ledger this repo accepts must be readable by vg. It is checked at the tag
     # pinned in tests/test_compat_viability_gate.py.
     #
-    # The fetch below is best-effort. If the pinned tag is not published, the
-    # checkout fails, the sibling directory is absent, and the test SKIPS with that
-    # reason instead of failing - a missing peer is not a defect in this repository.
-    # Once the tag exists, a real divergence turns this job red, which is the point.
+    # The clone carries every tag, so the pin stays in exactly one place: the test
+    # archives PINNED_VG_TAG out of it. The pinned tag is published, so a failed
+    # clone is a red build, not a silent skip. A real divergence also turns this
+    # job red, which is the point.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install dependencies
         run: python -m pip install --quiet pyyaml pytest
 
-      - name: Try to fetch the pinned viability-gate tag
-        continue-on-error: true
+      - name: Fetch viability-gate with its tags
         run: |
-          git clone --quiet --depth 1 --branch v0.1.0 \
+          git clone --quiet --filter=blob:none \
             https://github.com/KhomDev/viability-gate.git \
             "$GITHUB_WORKSPACE/../viability-gate"
 
       # Rust is preinstalled on the GitHub-hosted ubuntu runner; if cargo is
       # missing the test skips with that reason rather than failing.
-      - name: Cross-repo compatibility (skips when the pin is absent)
+      - name: Cross-repo compatibility
         run: python -m pytest tests/test_compat_viability_gate.py -q -rs

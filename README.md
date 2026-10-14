@@ -335,10 +335,10 @@ directions at the pinned tag — `vg init` output must satisfy this repo's schem
 and a ledger this repo accepts must be readable by `vg` — and it **skips rather than fails**
 when the sibling checkout `../viability-gate` is absent, when the pinned tag has not been
 published, or when `git` is unavailable. The in-repo half of the contract (schema ↔ taxonomy ↔
-example) always runs.
+example) always runs. Set `VG_SIBLING` to point the test at a checkout under another folder name.
 
-> **Current state:** the pinned tag `v0.1.0` does not exist in the sibling repository yet, so
-> the cross-repo assertions **skip**. See "Known limitations".
+> **Current state:** pinned to viability-gate `v0.4.0`. The cross-repo assertions **run** in CI,
+> and all of them pass at that tag.
 
 ### Install
 
@@ -382,9 +382,8 @@ All three are methodology. None ships target data.
   and it is not something you should cite as one.
 - **The unknowing-admin-harm framing is unproven.** The author's log contains no successful
   instance; some programs exclude it explicitly via `human_error`.
-- **The cross-repo compatibility test skips in this checkout**, because the pinned viability-gate
-  tag is not published yet. Until it is, the two repos' formats are compatible by inspection, not
-  by test.
+- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.0`). A later
+  viability-gate release is only covered once the pin is bumped.
 - **No example has been checked against a real program page.** Every example uses the reserved
   `.invalid` TLD, and every program in them is invented.
 - **The ledger format is a convention, not an enforcement mechanism.** Nothing stops you writing a
@@ -416,5 +415,11 @@ change any license.
 | `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CITATION.cff` | MIT (`LICENSE`) | documentation |
 
 No third-party program data is included or redistributed, so no third-party license applies to
-anything shipped here. `SECURITY.md` carries a contact placeholder that is deliberately
+anything shipped here.
+
+**No third-party data.** This repository contains methodology, schemas and tooling only. It
+ships no program names, no chains, no reward tables and no scope text from any third party.
+Program terms are the property of their programs; this repository grants no rights over them and
+reproduces none of them. (Until 0.3.0 this paragraph sat after the MIT text in `LICENSE`, which
+stopped GitHub from detecting the licence. [`LICENSE`](LICENSE) is now the MIT text alone.) `SECURITY.md` carries a contact placeholder that is deliberately
 unfilled — see that file.
