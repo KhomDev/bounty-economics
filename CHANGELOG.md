@@ -28,6 +28,48 @@ The tree itself is unchanged except for the tripwire fix recorded here.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-21
+
+A taxonomy-review release. I re-read the economics-relevant rejections in my own log — the ones
+whose earliest catchable gate was the severity floor, an exclusion clause, a below-floor severity,
+a program-level ceiling, or a cooperating-party precondition, including the most recent
+smart-contract batch — and asked whether any of them described an exclusion-clause pattern not
+already in `data/clause-classes.yaml` or a payout-tier structure not already in
+`data/tier-shapes.yaml`.
+
+**They did not.** Every floor rejection resolved to one of the five existing shapes
+(`critical_only` for the DualDefense / Critical-only programs, `high_and_above` for the valid
+Mediums that paid nothing), and every exclusion rejection mapped to one of the fourteen existing
+classes (`privileged_role`, `human_error`, `admin_input`, `dos_no_extraction`, `front_run_only`,
+`best_practice`, `design_issue`, `testing_limits`, `user_input`, `non_standard_token`, and the
+rest). The nearest thing to a new pattern — a program scoping payouts to "theft or permanent lock
+of principal," so that loss of undelivered yield or un-emitted rewards does not count — appeared
+as a single program's positive scope definition and otherwise as an internal no-extraction triage
+judgement, not as a recurring, program-authored exclusion clause with industry-standard wording.
+That is too thin to add a fifteenth class for, so no taxonomy entry was added and the counts stay
+at 5 tier shapes and 14 clause classes. Recording the "no new entry" conclusion, with its
+reasoning, is the point of this release.
+
+### Changed
+
+- **Cross-repo compatibility pin bumped `v0.4.0` → `v0.4.1`.** viability-gate published `v0.4.1`
+  (a LICENSE/README-only change; no code or ledger-format change), so the pin now tracks the
+  latest release. All nine cross-repo assertions pass at the new tag, in both directions. The pin
+  still lives only in `tests/test_compat_viability_gate.py`; the README "Current state" note and
+  the "Known limitations" entry are updated to match.
+- **Package version `0.2.0` → `0.3.0`.** No change to the schema (still v1), the taxonomies, or
+  the validator behaviour, so every ledger written for 0.2.0 still validates unchanged.
+
+### Added
+
+- **README worked note, "the floor, not the bug, decides."** A first-person note under the
+  payout-tier section, grounded in the log review above: the costliest entries were neither
+  misread exclusions nor duplicates but confirmed, PoC-backed findings sitting one tier below the
+  floor (a valid Medium on a `high_and_above` program, a valid Low on a `critical_only` program).
+  The lesson it draws — classify the tier shape before building the PoC, and treat the floor as a
+  cliff rather than a slope — is why `tier_shape` is the first ledger field. It names no program,
+  chain, or amount.
+
 ## [0.2.0] — 2026-10-14
 
 The first tagged release in this repository. The ledger schema is still v1. It
@@ -127,5 +169,6 @@ floor, that entry is now an **error**: set `tier_shape: unknown` and
 - The `any` tier shape was removed: a program documenting no severity floor is `low_and_above`.
   (Superseded — see the unstated-floor fix above.)
 
-[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/KhomDev/bounty-economics/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/KhomDev/bounty-economics/releases/tag/v0.2.0

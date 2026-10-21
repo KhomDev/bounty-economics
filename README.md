@@ -111,6 +111,32 @@ team agrees it is real. The reward table has no Medium row. Payout: zero.
 **Mode 2 — you misread "unknown" as "pays everything".** A program whose reward table you never
 read is not a program that pays everything. It is a program you know nothing about.
 
+### A note from the author's log: the floor, not the bug, decides
+
+The costliest entries in my own rejection log are not misread exclusion clauses and not
+duplicates. They are confirmed, PoC-backed findings that the team agreed were real — and that
+paid nothing because the program's floor sat one tier above the finding:
+
+- A **valid Medium with a working proof, on a `high_and_above` program.** The accounting defect
+  was reproduced and acknowledged; Medium had no reward row. Payout: zero. This shape produced
+  the single most expensive entry in the log — correct work, zero return.
+- A **valid Low, on a `critical_only` program** (often labelled "DualDefense" or similar). Low was
+  real and reproduced; the table paid Critical only. Out of scope for payout.
+
+Two lessons I had to learn the expensive way:
+
+1. **Classify the tier shape before you build the PoC, not after.** Every one of these entries
+   would have been caught by reading the reward table first — a twenty-minute task — instead of
+   after forty hours of proof work. The shape, not the severity of the bug, is what decided the
+   payout.
+2. **A finding "one tier below the floor" is worth exactly zero, not "almost paid."** A Medium on
+   a `high_and_above` program and a Low on a `critical_only` program are the same economic outcome
+   as a finding that was wrong: nothing. The floor is a cliff, not a slope.
+
+This is why `tier_shape` is the first field in the ledger and why `validate.py` warns the moment
+it sees `critical_only` or `high_and_above`: those are the shapes where correct work most often
+earns nothing.
+
 ### How to transcribe a tier
 
 1. Open the program's live scope/rewards page.
@@ -337,7 +363,7 @@ when the sibling checkout `../viability-gate` is absent, when the pinned tag has
 published, or when `git` is unavailable. The in-repo half of the contract (schema ↔ taxonomy ↔
 example) always runs. Set `VG_SIBLING` to point the test at a checkout under another folder name.
 
-> **Current state:** pinned to viability-gate `v0.4.0`. The cross-repo assertions **run** in CI,
+> **Current state:** pinned to viability-gate `v0.4.1`. The cross-repo assertions **run** in CI,
 > and all of them pass at that tag.
 
 ### Install
@@ -382,7 +408,7 @@ All three are methodology. None ships target data.
   and it is not something you should cite as one.
 - **The unknowing-admin-harm framing is unproven.** The author's log contains no successful
   instance; some programs exclude it explicitly via `human_error`.
-- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.0`). A later
+- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.1`). A later
   viability-gate release is only covered once the pin is bumped.
 - **No example has been checked against a real program page.** Every example uses the reserved
   `.invalid` TLD, and every program in them is invented.
