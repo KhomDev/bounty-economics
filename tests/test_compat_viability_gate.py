@@ -53,7 +53,7 @@ from validate import (  # noqa: E402
 
 # The single source of truth for the cross-repo pin. Bump it when viability-gate
 # publishes a tag that changes the ledger format or `vg init`.
-PINNED_VG_TAG = "v0.4.0"
+PINNED_VG_TAG = "v0.4.1"
 
 # The sibling checkout, relative to this repo. Both live under the same parent.
 # VG_SIBLING overrides it, for a checkout kept under a different folder name.
