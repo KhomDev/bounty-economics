@@ -28,6 +28,41 @@ The tree itself is unchanged except for the tripwire fix recorded here.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-28
+
+A re-review release with one new capability.
+
+### Added
+
+- **Gate cross-reference — the two repos now compose.** `data/gate-crossref.yaml`
+  maps the shared gate vocabulary onto this repo's catalogs for the gates decided
+  by the program's own terms: `G1_severity_floor → tier-shapes`,
+  `G2_exclusion_clause → clause-classes`, with `program_ceiling` and
+  `P16_below_floor` also resolving to tier-shapes and `G4_prior_audit` to the
+  prior-audit surface. `scripts/crossref.py` resolves a gate token to the catalog
+  that reads the program page for it; `tests/test_crossref.py` keeps every gate
+  token inside the shared vocabulary and every catalog reference resolvable. Gates
+  whose signal is not in the program's terms are listed as *not answered here*, so
+  the cross-reference is honest about its edges. Closes the loop:
+  anti-pattern (viability-gate) → gate token → program-terms catalog (here).
+
+### Changed
+
+- **Compatibility pin bumped to viability-gate `v0.4.3`** (`PINNED_VG_TAG`). The
+  ledger format is unchanged since `v0.4.1`; `v0.4.2` and `v0.4.3` were docs/CI
+  releases, so the cross-repo contract is unchanged — the pin just tracks the
+  current tag.
+
+### Reviewed — no change
+
+- **Still no new clause class.** The rejections logged since the 0.3.0 review were
+  re-read for an exclusion-clause pattern not already among the fourteen classes.
+  Both were no-attacker-win / permanent-liveness rejections, not exclusion-clause
+  rejections, so the "theft or permanent lock of principal" scoping flagged at the
+  0.3.0 review did **not** recur with program-authored wording — it remains a one-off.
+  `data/clause-classes.yaml` stays at fourteen; `data/tier-shapes.yaml` stays at
+  five.
+
 ## [0.3.0] — 2026-10-21
 
 A taxonomy-review release. I re-read the economics-relevant rejections in my own log — the ones

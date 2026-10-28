@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bounty-economics"
-version = "0.3.0"
+version = "0.4.0"
 description = "Payout-tier and exclusion-clause taxonomies for bug-bounty programs, plus a validator for your own private ledger"
 readme = "README.md"
 license = { file = "LICENSE" }

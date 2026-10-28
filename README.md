@@ -33,8 +33,10 @@ current, and cited.
 `
 data/tier-shapes.yaml               the 5 tier shapes, with detection and risk notes
 data/clause-classes.yaml            the 14 exclusion-clause classes, with escape hatches
+data/gate-crossref.yaml             which catalog answers each viability-gate gate token
 schemas/ledger.schema.json          JSON Schema (v1) for a private ledger
 scripts/validate.py                 validates a ledger; --taxonomy prints the vocabularies
+scripts/crossref.py                 gate token -> the catalog that reads the program page for it
 scripts/check_generic.py            fails if a taxonomy or the schema names a platform or a foreign repo
 examples/ledger.example.yaml        one fictional entry, showing the shape
 examples/tier-shapes.example.yaml   five fictional entries, one per tier shape
@@ -363,8 +365,9 @@ when the sibling checkout `../viability-gate` is absent, when the pinned tag has
 published, or when `git` is unavailable. The in-repo half of the contract (schema ↔ taxonomy ↔
 example) always runs. Set `VG_SIBLING` to point the test at a checkout under another folder name.
 
-> **Current state:** pinned to viability-gate `v0.4.1`. The cross-repo assertions **run** in CI,
-> and all of them pass at that tag.
+> **Current state:** pinned to viability-gate `v0.4.3`. The cross-repo assertions **run** in CI,
+> and all of them pass at that tag. (The ledger format is unchanged since `v0.4.1`; `v0.4.2` and
+> `v0.4.3` were docs/CI releases.)
 
 ### Install
 
@@ -389,6 +392,34 @@ test and the compatibility test on Python 3.10 through 3.13.
 
 The taxonomies are the contribution. The instances stay with whoever read the page.
 
+## Composing with viability-gate: the gate cross-reference
+
+The three repos share one gate vocabulary. [viability-gate](https://github.com/KhomDev/viability-gate)
+maps each of its anti-patterns onto a gate token — a fired rule is a statement *about* a gate. This
+repo closes the loop for the two gates that are decided by the **program's own terms** rather than by
+the finding's prose:
+
+```
+anti-pattern (viability-gate)  ->  gate token  ->  program-terms catalog (here)
+```
+
+`data/gate-crossref.yaml` is the mapping, and `scripts/crossref.py` resolves it:
+
+```bash
+python scripts/crossref.py                      # the whole cross-reference
+python scripts/crossref.py G2_exclusion_clause  # -> clause-classes (the 14 ids)
+python scripts/crossref.py G1_severity_floor    # -> tier-shapes (the 5 ids)
+```
+
+The two load-bearing mappings are `G1_severity_floor → tier-shapes` (the reward table) and
+`G2_exclusion_clause → clause-classes` (the scope page); `program_ceiling` and `P16_below_floor`
+also resolve to tier-shapes, and `G4_prior_audit` points at the prior-audit surface this repo
+documents in prose. The cross-reference is deliberately **honest about its edges**: gates whose
+signal is not in the program's terms (`D1_duplicate_check`, `G3_scope_tree`, `P17_no_attacker_win`
+and the rest) are listed as *not answered here*, with a note saying where the signal actually
+lives. `tests/test_crossref.py` keeps every gate token inside the shared vocabulary and every
+catalog reference resolvable.
+
 ## How this relates to the other repos
 
 | Repo | Question it answers | Ships |
@@ -408,7 +439,7 @@ All three are methodology. None ships target data.
   and it is not something you should cite as one.
 - **The unknowing-admin-harm framing is unproven.** The author's log contains no successful
   instance; some programs exclude it explicitly via `human_error`.
-- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.1`). A later
+- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.3`). A later
   viability-gate release is only covered once the pin is bumped.
 - **No example has been checked against a real program page.** Every example uses the reserved
   `.invalid` TLD, and every program in them is invented.
