@@ -29,7 +29,7 @@ try:
     import yaml
 except ImportError:  # pragma: no cover
     print("crossref: PyYAML is required (pip install pyyaml)", file=sys.stderr)
-    raise SystemExit(2)
+    raise SystemExit(2) from None
 
 ROOT = Path(__file__).resolve().parent.parent
 CROSSREF_FILE = ROOT / "data" / "gate-crossref.yaml"
