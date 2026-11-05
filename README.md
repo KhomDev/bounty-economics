@@ -365,9 +365,9 @@ when the sibling checkout `../viability-gate` is absent, when the pinned tag has
 published, or when `git` is unavailable. The in-repo half of the contract (schema ↔ taxonomy ↔
 example) always runs. Set `VG_SIBLING` to point the test at a checkout under another folder name.
 
-> **Current state:** pinned to viability-gate `v0.4.3`. The cross-repo assertions **run** in CI,
-> and all of them pass at that tag. (The ledger format is unchanged since `v0.4.1`; `v0.4.2` and
-> `v0.4.3` were docs/CI releases.)
+> **Current state:** pinned to viability-gate `v0.4.4`. The cross-repo assertions **run** in CI,
+> and all of them pass at that tag. (The ledger format is unchanged since `v0.4.1`; `v0.4.2` to
+> `v0.4.4` were docs, CI and dependency releases.)
 
 ### Install
 
@@ -427,8 +427,9 @@ catalog reference resolvable.
 | **bounty-economics** (this) | *Can this program pay for what I found?* | Taxonomies of program terms + ledger schema |
 | [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy) | *Why do findings fail after submission?* | Outcome taxonomy + aggregate stats |
 | [viability-gate](https://github.com/KhomDev/viability-gate) | *Should I submit this specific draft?* | The CLI that runs both against your private inputs |
+| [realism-gate](https://github.com/KhomDev/realism-gate) | *Does my PoC show what an attacker can do?* | A static checker for Foundry PoC tests |
 
-All three are methodology. None ships target data.
+All four are methodology. None ships target data.
 
 ## Known limitations
 
@@ -439,7 +440,7 @@ All three are methodology. None ships target data.
   and it is not something you should cite as one.
 - **The unknowing-admin-harm framing is unproven.** The author's log contains no successful
   instance; some programs exclude it explicitly via `human_error`.
-- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.3`). A later
+- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.4`). A later
   viability-gate release is only covered once the pin is bumped.
 - **No example has been checked against a real program page.** Every example uses the reserved
   `.invalid` TLD, and every program in them is invented.

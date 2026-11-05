@@ -28,6 +28,18 @@ The tree itself is unchanged except for the tripwire fix recorded here.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-11-05
+
+A maintenance release. Taxonomies, schema and ledger format are unchanged.
+
+### Changed
+
+- The cross-repo compatibility test is pinned to viability-gate `v0.4.4` (was
+  `v0.4.3`). That release changes no ledger or `vg init` behaviour; the test
+  passes at the new tag.
+- "How this relates to the other repos" lists the new sibling,
+  [realism-gate](https://github.com/KhomDev/realism-gate).
+
 ## [0.4.0] — 2026-10-28
 
 A re-review release with one new capability.
@@ -204,6 +216,8 @@ floor, that entry is now an **error**: set `tier_shape: unknown` and
 - The `any` tier shape was removed: a program documenting no severity floor is `low_and_above`.
   (Superseded — see the unstated-floor fix above.)
 
-[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/KhomDev/bounty-economics/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/KhomDev/bounty-economics/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/KhomDev/bounty-economics/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/KhomDev/bounty-economics/releases/tag/v0.2.0
