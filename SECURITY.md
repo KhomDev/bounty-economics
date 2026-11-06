@@ -13,13 +13,12 @@ no runtime service and no handled personal data. The realistic security issues a
 
 ## Contact
 
-> **STOP GATE — the maintainer must fill this in.**
->
-> `TODO(human): contact`
->
-> No address is invented here on purpose. Until this line is replaced, **this repository has no
-> working private security contact**, and reporters should open an issue that does not itself
-> contain anything sensitive. Choosing and publishing a contact address is a human decision.
+Report privately through GitHub: open the repository's **Security** tab and choose **Report a
+vulnerability** (<https://github.com/KhomDev/bounty-economics/security/advisories/new>). The
+report is visible only to the maintainer until an advisory is published.
+
+**Do not open a public issue for a disclosure.** A public issue republishes the very text you are
+reporting.
 
 ## What to include
 

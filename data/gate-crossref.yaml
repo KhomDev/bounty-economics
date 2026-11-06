@@ -1,6 +1,6 @@
 # Gate cross-reference — which of this repo's catalogs answers a viability-gate gate.
 #
-# The three repos share one gate vocabulary (documented in
+# The four repos share one gate vocabulary (documented in
 # rejection-taxonomy/data/SCHEMA.md and used by viability-gate, whose
 # docs/gate-mapping.yaml maps each anti-pattern P1..P22 onto a gate token).
 # That mapping runs ONE way: a fired anti-pattern -> the gate token it is a

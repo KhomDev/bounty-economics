@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: python -m pip install --quiet pyyaml pytest jsonschema ruff
+        run: python -m pip install --quiet -r requirements-ci.txt
 
       - name: Tests
         # -rs prints the reason for every skip, so a skipped cross-repo assertion
@@ -91,11 +91,22 @@ jobs:
           fi
           echo "placeholder host correctly rejected"
 
-      - name: Console script installs and runs
+      # A plain (non-editable) install into a clean venv, run from OUTSIDE the
+      # checkout: the taxonomies and the schema must ship inside the package.
+      # Before 0.5.0 only an editable install worked.
+      - name: Wheel installs into a clean venv and runs
         run: |
-          python -m pip install --quiet -e .
-          bounty-econ-validate --taxonomy > /dev/null
-          bounty-econ-validate examples/ledger.example.yaml --format json > /dev/null
+          set -e
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/python -m pip install --quiet .
+          ledger="$PWD/examples/ledger.example.yaml"
+          cd /tmp
+          /tmp/wheel-venv/bin/bounty-econ-validate --taxonomy > /dev/null
+          /tmp/wheel-venv/bin/bounty-econ-validate "$ledger" --format json > /dev/null
+          if ls /tmp/wheel-venv/lib/python*/site-packages/validate.py 2>/dev/null; then
+            echo "::error::the package installed a top-level module called validate"
+            exit 1
+          fi
 
   compat:
     # The cross-repo contract: vg init output must satisfy this repo's schema, and
@@ -103,10 +114,13 @@ jobs:
     # pinned in tests/test_compat_viability_gate.py.
     #
     # The clone carries every tag, so the pin stays in exactly one place: the test
-    # archives PINNED_VG_TAG out of it. The pinned tag is published, so a failed
-    # clone is a red build, not a silent skip. A real divergence also turns this
-    # job red, which is the point.
+    # archives PINNED_VG_TAG out of it. BE_COMPAT_REQUIRED turns a missing clone,
+    # tag or toolchain into a red build rather than a silent skip. A real
+    # divergence also turns this job red, which is the point.
     runs-on: ubuntu-latest
+    env:
+      # Every skip reason (no sibling, no pinned tag, no cargo) fails instead.
+      BE_COMPAT_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v7
 
@@ -115,7 +129,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: python -m pip install --quiet pyyaml pytest
+        run: python -m pip install --quiet -r requirements-ci.txt
 
       - name: Fetch viability-gate with its tags
         run: |
@@ -124,6 +138,6 @@ jobs:
             "$GITHUB_WORKSPACE/../viability-gate"
 
       # Rust is preinstalled on the GitHub-hosted ubuntu runner; if cargo is
-      # missing the test skips with that reason rather than failing.
+      # missing, BE_COMPAT_REQUIRED makes the job fail.
       - name: Cross-repo compatibility
         run: python -m pytest tests/test_compat_viability_gate.py -q -rs

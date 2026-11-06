@@ -12,10 +12,12 @@
 # Two things this file deliberately does NOT say:
 #
 #   1. There is no `any` shape. See the note under `low_and_above`.
-#   2. A page that states no floor is NOT `low_and_above`. An unstated floor is
-#      not evidence that Low pays; it is evidence the page has not been read.
-#      That entry is `tier_shape: unknown` with `floor_status: unstated`, and
-#      the validator warns on it. See `unknown` below.
+#   2. A page that SAYS NOTHING about a floor is NOT `low_and_above`. An
+#      unstated floor is not evidence that Low pays; it is evidence the page has
+#      not been read. That entry is `tier_shape: unknown` with `floor_status:
+#      unstated`, and the validator warns on it. See `unknown` below.
+#      (A page that EXPLICITLY states "SEVERITY FLOOR: NONE" or "any" has said
+#      something: that is `low_and_above` with `floor_status: documented`.)
 
 version: 1
 
@@ -32,7 +34,7 @@ shapes:
       drift — has an expected value of zero here. Not low. Zero.
     detection:
       - "The reward table lists only a Critical row."
-      - "The program states 'Critical-only', 'DualDefense', or similar."
+      - "The program describes itself as critical-only, in whatever product name."
       - "A High-severity finding was previously closed as out-of-scope-by-tier."
     verify: >-
       Confirm against the live rewards page before hunting. If your thesis cannot
@@ -73,12 +75,12 @@ shapes:
     detection:
       - "The reward table lists a Low row with a non-zero amount."
       - "Low is the lowest row with a non-zero amount, whatever the page calls it."
+      - "The page explicitly states 'SEVERITY FLOOR: NONE' or 'any' (floor_status: documented)."
     verify: >-
       Check the duplicate surface as carefully as the floor. A wide floor is an
       invitation to the crowd.
-    # NOT a detection signal for this shape: "the page states no floor".
-    #
-    # A page that states no floor has not been classified, it has not been read.
+    # NOT a detection signal for this shape: a page that says nothing about a
+    # floor. That page has not been classified, it has not been read.
     # That entry is `tier_shape: unknown` with `floor_status: unstated` — the
     # validator errors if you write `low_and_above` beside `unstated`.
     #
@@ -106,7 +108,7 @@ shapes:
       you will make it while believing you did your homework.
     detection:
       - "You have not opened the program's rewards page yet."
-      - "The page states no floor at all, so no reward table has been read yet."
+      - "The page says nothing about a floor, so no reward table has been read yet."
     verify: >-
       Open it. This is a twenty-minute task that decides whether the next forty
       hours are worth spending.

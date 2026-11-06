@@ -34,16 +34,31 @@ TOKENS: tuple[str, ...] = (
     "cosmos", "cosmwasm", "ibc", "cairo", "starknet", "near", "polkadot",
     "bounce", "witness", "precompile", "create2", "erc-",
     "hackenproof", "immunefi", "cantina", "sherlock", "code4rena",
+    "dualdefense", "dualdefence", "flashpool", "flash pool", "primacy of impact",
+    "primacy of rules", "hats finance", "bugcrowd", "hackerone", "yeswehack",
 )
 
-# The subset that is a third-party bug-bounty platform or code host rather than a
-# chain. `check_generic.py` uses this against the shipped data.
+# The subset that is a third-party bug-bounty platform, a platform's PRODUCT
+# name, or a platform-specific rule term rather than a chain. A product name
+# identifies its platform as surely as the platform's own name does: the 0.4.x
+# taxonomy shipped one ("DualDefense") and none of the checks caught it.
+# `check_generic.py` uses this against the shipped data.
 PLATFORM_TOKENS: tuple[str, ...] = (
     "hackenproof",
     "immunefi",
     "cantina",
     "sherlock",
     "code4rena",
+    "dualdefense",
+    "dualdefence",
+    "flashpool",
+    "flash pool",
+    "primacy of impact",
+    "primacy of rules",
+    "hats finance",
+    "bugcrowd",
+    "hackerone",
+    "yeswehack",
 )
 
 _WORD_CHAR = re.compile(r"[A-Za-z0-9_]")

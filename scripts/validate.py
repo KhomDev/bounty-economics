@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Validate a private program ledger against the shipped taxonomies.
+"""Validate a private program ledger against the shipped schema and taxonomies.
 
 The ledger is YOUR transcription of bug-bounty program terms, and it is private:
-entries name real programs. This validator checks structure and, more
-importantly, that every entry is CITED — an uncited entry is a guess, and a
-guessed payout floor is worse than none because you will act on it.
+entries name real programs. This validator checks the ledger against
+`schemas/ledger.schema.json` (unknown keys, types, formats), then applies the
+rules a schema cannot express - most importantly, that every entry is CITED. An
+uncited entry is a guess, and a guessed payout floor is worse than none because
+you will act on it.
 
 The vocabularies come from `data/tier-shapes.yaml` and `data/clause-classes.yaml`,
 so this script and the docs cannot drift apart.
@@ -24,11 +26,12 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import re
 import sys
-from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import yaml
@@ -36,7 +39,28 @@ except ImportError:
     print("ERROR: PyYAML required.  pip install pyyaml", file=sys.stderr)
     raise SystemExit(2) from None
 
-ROOT = Path(__file__).resolve().parent.parent
+try:
+    import jsonschema
+except ImportError:
+    print("ERROR: jsonschema required.  pip install jsonschema", file=sys.stderr)
+    raise SystemExit(2) from None
+
+
+def _data_root() -> Path:
+    """Where data/ and schemas/ live: the repository, or the installed package.
+
+    In a checkout this file is scripts/validate.py and the data sits beside
+    scripts/. Installed, it is bounty_economics/validate.py and the data is
+    packaged as bounty_economics/data and bounty_economics/schemas.
+    """
+    here = Path(__file__).resolve().parent
+    for root in (here.parent, here):
+        if (root / "data" / "tier-shapes.yaml").exists():
+            return root
+    return here.parent
+
+
+ROOT = _data_root()
 TIER_FILE = ROOT / "data" / "tier-shapes.yaml"
 CLAUSE_FILE = ROOT / "data" / "clause-classes.yaml"
 SCHEMA_FILE = ROOT / "schemas" / "ledger.schema.json"
@@ -49,27 +73,75 @@ SCHEMA_VERSION = 1
 FLOOR_SEVERITIES = {"critical", "high", "medium", "low", None}
 
 # Whether the FLOOR itself was read off the page. This is the field that stops
-# "no floor statement" being transcribed as "Low pays".
+# "the page says nothing about a floor" being transcribed as "Low pays".
 #
-#   documented  — the reward table was read and its lowest paying tier recorded
-#   unstated    — no floor statement exists on the page
+#   documented  — the reward table was read and its lowest paying tier recorded,
+#                 or the page explicitly states "SEVERITY FLOOR: NONE / any"
+#   unstated    — the page says nothing about a floor
 #   conflicting — the program's own materials disagree about the floor
 FLOOR_STATUSES = ("documented", "unstated", "conflicting")
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-# Placeholder hosts that indicate the example was copied without editing.
-PLACEHOLDER_HOSTS = ("example.invalid", "example.com", "localhost", "todo")
+# Placeholder hosts: a source_url on one of these was copied without editing.
+# Matched against the URL's HOST, never as a substring of the whole URL - a real
+# repository called "todo-list" is not a placeholder.
+PLACEHOLDER_HOSTS = ("example.com", "www.example.com", "localhost", "127.0.0.1")
+PLACEHOLDER_SUFFIXES = (".invalid", ".localhost")
+PLACEHOLDER_LABELS = ("todo", "tbd", "changeme")
 
 STALE_DAYS = 180
+
+# Constructs Python's `re` accepts but viability-gate's Rust `regex` crate does
+# not. A ledger is read by both tools, so a pattern must be in their common
+# subset: one that compiles here and fails there would make vg's G2 fail.
+UNSUPPORTED_REGEX = (
+    (re.compile(r"\(\?<?[=!]"), "lookaround"),
+    (re.compile(r"(?<!\\)\\[1-9]"), "a numbered backreference"),
+    (re.compile(r"\(\?P=|\\k<"), "a named backreference"),
+    (re.compile(r"\(\?>"), "an atomic group"),
+    (re.compile(r"[*+?}][+]"), "a possessive quantifier"),
+)
+
+# Schema errors the semantic checks below already report with a better
+# message. Everything else the schema finds (unknown keys, wrong types, bad
+# formats) is reported as it comes.
+_SCHEMA_COVERED = {"required", "enum", "const", "pattern", "minLength"}
+
+
+def placeholder_host(url: str) -> str | None:
+    """The placeholder host in url, or None."""
+    host = (urlparse(url).hostname or "").lower().rstrip(".")
+    if not host:
+        return None
+    if host in PLACEHOLDER_HOSTS or host.endswith(PLACEHOLDER_SUFFIXES):
+        return host
+    if any(label in PLACEHOLDER_LABELS for label in host.split(".")):
+        return host
+    return None
+
+
+def regex_problem(pattern: str) -> str | None:
+    """Why pattern is unusable by both tools, or None."""
+    for probe, name in UNSUPPORTED_REGEX:
+        if probe.search(pattern):
+            return (
+                f"uses {name}, which viability-gate's Rust regex does not support "
+                f"(no lookaround, no backreferences)"
+            )
+    try:
+        re.compile(pattern, re.IGNORECASE)
+    except re.error as err:
+        return f"invalid regex: {err}"
+    return None
 
 
 def load_taxonomies() -> tuple[dict[str, dict], dict[str, dict]]:
     """Return (tier_shapes, clause_classes), keyed by id."""
     if not TIER_FILE.exists() or not CLAUSE_FILE.exists():
         print(
-            f"ERROR: taxonomy files missing ({TIER_FILE.name}, {CLAUSE_FILE.name})",
+            f"ERROR: taxonomy files missing ({TIER_FILE}, {CLAUSE_FILE})",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -78,6 +150,31 @@ def load_taxonomies() -> tuple[dict[str, dict], dict[str, dict]]:
     tier_map = {s["id"]: s for s in tiers.get("shapes", [])}
     clause_map = {c["id"]: c for c in clauses.get("classes", [])}
     return tier_map, clause_map
+
+
+_ENTRY_VALIDATOR: jsonschema.protocols.Validator | None = None
+
+
+def entry_validator() -> jsonschema.protocols.Validator:
+    """A validator for ONE ledger entry: the schema's `items`."""
+    global _ENTRY_VALIDATOR
+    if _ENTRY_VALIDATOR is None:
+        schema = json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
+        item = dict(schema["items"])
+        item["$schema"] = schema["$schema"]
+        cls = jsonschema.validators.validator_for(item)
+        _ENTRY_VALIDATOR = cls(item, format_checker=cls.FORMAT_CHECKER)
+    return _ENTRY_VALIDATOR
+
+
+def schema_errors(entry: dict, where: str) -> list[str]:
+    out = []
+    for err in sorted(entry_validator().iter_errors(entry), key=lambda e: list(e.absolute_path)):
+        if err.validator in _SCHEMA_COVERED:
+            continue
+        path = ".".join(str(p) for p in err.absolute_path) or "(entry)"
+        out.append(f"{where}: schema: {path}: {err.message}")
+    return out
 
 
 def validate_entry(
@@ -108,6 +205,16 @@ def validate_entry(
         if not SLUG_RE.match(str(ident)):
             errors.append(f"{where}: id must match {SLUG_RE.pattern}")
 
+    # --- the schema: unknown keys, types, formats ------------------------
+    #
+    # An unquoted YAML date is read as a date object; it is reported as a
+    # warning below and checked as its string form here, so the one mistake is
+    # not reported twice.
+    as_text = dict(entry)
+    if isinstance(as_text.get("retrieved"), dt.date):
+        as_text["retrieved"] = as_text["retrieved"].isoformat()
+    errors.extend(schema_errors(as_text, where))
+
     # --- ledger format version -------------------------------------------
     version = entry.get("schema_version")
     if version is not None and version != SCHEMA_VERSION:
@@ -124,13 +231,13 @@ def validate_entry(
         errors.append(f"{where}: missing required field 'tier_shape'")
     elif shape == "any":
         # Removed from the taxonomy. Give the migration rather than a bare
-        # "not in enum", because the fix is a one-word change and the reason
-        # matters more than the error.
+        # "not in enum", because the fix depends on what the page says.
         errors.append(
-            f"{where}: tier_shape 'any' was removed. A program documenting no "
-            f"severity floor is 'low_and_above' — informational findings are "
-            f"acknowledged rather than paid, and Low is the lowest tier that pays. "
-            f"Change 'any' to 'low_and_above'."
+            f"{where}: tier_shape 'any' was removed. If the page explicitly states "
+            f"'SEVERITY FLOOR: NONE' or 'any', use 'low_and_above' with "
+            f"floor_status 'documented' - informational findings are acknowledged "
+            f"rather than paid, so Low is the lowest tier that pays. If the page "
+            f"says nothing about a floor, use 'unknown' with floor_status 'unstated'."
         )
     elif shape not in tier_map:
         errors.append(f"{where}: tier_shape {shape!r} not in {sorted(tier_map)}")
@@ -153,8 +260,10 @@ def validate_entry(
     if floor == "informational":
         errors.append(
             f"{where}: floor_severity 'informational' is not a real floor — no "
-            f"program pays informational in practice. Use 'low' if the program "
-            f"documents no floor at all."
+            f"program pays informational in practice. If the page explicitly states "
+            f"no floor, record 'low' with floor_status 'documented'; if it says "
+            f"nothing about a floor, leave floor_severity null with floor_status "
+            f"'unstated'."
         )
     elif floor is not None and floor not in FLOOR_SEVERITIES:
         allowed = sorted(s for s in FLOOR_SEVERITIES if s)
@@ -172,17 +281,17 @@ def validate_entry(
 
     # --- floor_status: was the floor READ, or merely assumed? -------------
     #
-    # The defect this field exists to prevent: transcribing "the page states no
-    # floor" as "Low pays". An unstated floor is not evidence about the program
-    # at all — it is evidence the page has not been read. So an unstated floor
-    # must keep tier_shape at 'unknown', and the validator says so out loud.
+    # The defect this field exists to prevent: transcribing "the page says
+    # nothing about a floor" as "Low pays". An unstated floor is not evidence
+    # about the program at all — it is evidence the page has not been read. So
+    # an unstated floor must keep tier_shape at 'unknown'.
     status = entry.get("floor_status")
     if status is None:
         warnings.append(
             f"{where}: floor_status is missing. Record whether the floor was "
             f"'documented', 'unstated' or 'conflicting'. Without it the validator "
-            f"cannot tell a floor you read from one you never looked for, and an "
-            f"unstated floor is not evidence that Low pays."
+            f"cannot tell a floor you read from one you never looked for, and "
+            f"viability-gate's G1 fails the entry."
         )
     elif status not in FLOOR_STATUSES:
         errors.append(
@@ -222,10 +331,10 @@ def validate_entry(
             )
     else:  # conflicting
         if shape is not None and shape != "unknown":
-            warnings.append(
+            errors.append(
                 f"{where}: floor_status is 'conflicting' but tier_shape is "
                 f"{shape!r} — the program's materials disagree, so the shape is "
-                f"not settled. Use 'unknown' until you resolve it."
+                f"not settled. Keep tier_shape 'unknown' until you resolve it."
             )
         warnings.append(
             f"{where}: the program's own materials disagree about the floor. "
@@ -243,27 +352,27 @@ def validate_entry(
     else:
         if not str(url).startswith(("http://", "https://")):
             errors.append(f"{where}: source_url must be http(s)")
-        if any(h in str(url) for h in PLACEHOLDER_HOSTS):
+        host = placeholder_host(str(url))
+        if host:
             if example_mode:
                 warnings.append(
-                    f"{where}: source_url uses a placeholder host ({url}) — "
+                    f"{where}: source_url uses a placeholder host ({host}) — "
                     f"expected in an example file, not in a real ledger."
                 )
             else:
                 errors.append(
                     f"{where}: source_url still points at a placeholder host "
-                    f"({url}). Replace it with the real page."
+                    f"({host}). Replace it with the real page."
                 )
 
     retrieved = entry.get("retrieved")
     if not retrieved:
         errors.append(f"{where}: missing 'retrieved' date.")
     else:
-        text = str(retrieved)
+        text = retrieved.isoformat() if isinstance(retrieved, dt.date) else str(retrieved)
         if not isinstance(retrieved, str):
             # YAML turns an unquoted 2026-10-01 into a date object. The ledger
-            # format says string, and the JSON Schema says string, so an unquoted
-            # date is accepted here but rejected by any JSON-Schema consumer.
+            # format and the JSON Schema say string.
             warnings.append(
                 f"{where}: retrieved was written unquoted, so YAML read it as "
                 f"{type(retrieved).__name__}, not a string. The schema declares a "
@@ -273,14 +382,20 @@ def validate_entry(
             errors.append(f"{where}: retrieved must be YYYY-MM-DD, got {text!r}")
         else:
             try:
-                age = (date.today() - date.fromisoformat(text)).days
-                if age > STALE_DAYS:
+                age = (dt.date.today() - dt.date.fromisoformat(text)).days
+            except ValueError:
+                errors.append(f"{where}: retrieved {text!r} is not a valid date")
+            else:
+                if age < 0:
+                    errors.append(
+                        f"{where}: retrieved {text} is in the future. Record the "
+                        f"date you actually read the page."
+                    )
+                elif age > STALE_DAYS:
                     warnings.append(
                         f"{where}: retrieved {age} days ago. Program terms change "
                         f"without notice — re-read the page before relying on this."
                     )
-            except ValueError:
-                errors.append(f"{where}: retrieved {text!r} is not a valid date")
 
     # --- exclusions -------------------------------------------------------
     exclusions = entry.get("exclusions") or []
@@ -300,10 +415,9 @@ def validate_entry(
             errors.append(f"{where}: exclusions[{j}] missing verbatim 'clause'")
         pattern = exc.get("pattern")
         if pattern:
-            try:
-                re.compile(pattern)
-            except re.error as err:
-                errors.append(f"{where}: exclusions[{j}].pattern invalid regex: {err}")
+            problem = regex_problem(str(pattern))
+            if problem:
+                errors.append(f"{where}: exclusions[{j}].pattern {problem}")
 
     # --- prior audits -----------------------------------------------------
     audits = entry.get("prior_audits") or []
@@ -316,6 +430,11 @@ def validate_entry(
             continue
         if not audit.get("firm"):
             errors.append(f"{where}: prior_audits[{j}] missing 'firm'")
+        if not audit.get("url"):
+            warnings.append(
+                f"{where}: prior_audits[{j}] has no 'url'. Cite the report, as for "
+                f"the floor."
+            )
         if not audit.get("covers"):
             warnings.append(
                 f"{where}: prior_audits[{j}] has no 'covers' list. A report naming "
@@ -410,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
         example_mode = args.example_mode or path.name.endswith(".example.yaml")
 
         try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data = yaml.safe_load(path.read_text(encoding="utf-8-sig"))
         except yaml.YAMLError as err:
             return fail(f"cannot parse YAML in {path}: {err}")
 

@@ -17,6 +17,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -474,3 +476,113 @@ def main_runner() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main_runner())
+
+
+# ---------------------------------------------------------------- 0.5.0 audit fixes
+#
+# Each test below pins a defect reproduced with the 0.4.1 validator during the
+# 2026-11-06 audit.
+
+
+def test_an_unknown_key_is_an_error():
+    # REPRODUCED: `exclusionz:` was accepted, so the exclusions silently vanished.
+    errors, _ = check(entry(exclusionz=[]))
+    assert any("exclusionz" in x and "schema" in x for x in errors), errors
+
+
+def test_an_unknown_nested_key_is_an_error():
+    errors, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "patern": "admin"}])
+    )
+    assert any("patern" in x for x in errors), errors
+
+
+def test_a_wrong_type_is_an_error():
+    errors, _ = check(entry(conflicts="one string, not a list"))
+    assert any("conflicts" in x for x in errors), errors
+
+
+def test_schema_errors_are_not_duplicated_for_a_missing_citation():
+    e = entry()
+    del e["source_url"]
+    errors, _ = check(e)
+    assert len([x for x in errors if "source_url" in x]) == 1, errors
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    ["(?<!un)privileged", "(?=admin)owner", "(owner)\\1", "(?P<r>owner)(?P=r)", "a++"],
+)
+def test_a_pattern_viability_gate_cannot_compile_is_an_error(pattern):
+    # REPRODUCED: a lookbehind passed here and was "invalid regex" in vg's G2.
+    errors, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": pattern}])
+    )
+    assert any("exclusions[0].pattern" in x for x in errors), errors
+
+
+def test_every_suggested_pattern_is_in_the_common_dialect():
+    from validate import regex_problem
+
+    for cid, spec in CLAUSES.items():
+        pattern = spec.get("suggested_pattern")
+        if pattern:
+            assert regex_problem(pattern) is None, (cid, regex_problem(pattern))
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/acme/todo-list-protocol/blob/main/BOUNTY.md",
+        "https://docs.real-program.org/todo/rewards",
+        "https://myexample.com/rewards",
+    ],
+)
+def test_a_real_url_containing_a_placeholder_word_is_not_a_placeholder(url):
+    # REPRODUCED: "todo" anywhere in the URL was an error.
+    errors, _ = check(entry(source_url=url))
+    assert not any("placeholder" in x for x in errors), errors
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.invalid/rewards",
+        "https://rewards.example.invalid/",
+        "http://localhost:8000/rewards",
+        "https://todo/rewards",
+        "https://example.com/rewards",
+    ],
+)
+def test_a_placeholder_host_is_caught_by_host(url):
+    errors, _ = check(entry(source_url=url))
+    assert any("placeholder" in x for x in errors), errors
+
+
+def test_a_future_retrieved_date_is_an_error():
+    future = (date.today().replace(year=date.today().year + 1)).isoformat()
+    errors, _ = check(entry(retrieved=future))
+    assert any("future" in x for x in errors), errors
+
+
+def test_a_conflicting_floor_beside_a_settled_shape_is_an_error():
+    # The README says a conflicting floor keeps tier_shape 'unknown'; vg's G1
+    # fails it. The validator now agrees instead of only warning.
+    errors, _ = check(entry(tier_shape="medium_and_above", floor_status="conflicting"))
+    assert any("conflicting" in x for x in errors), errors
+
+
+def test_the_any_migration_message_distinguishes_explicit_from_absent():
+    errors, _ = check(entry(tier_shape="any"))
+    joined = " ".join(errors)
+    assert "low_and_above" in joined and "unstated" in joined, joined
+
+
+def test_the_schema_and_the_readme_agree_on_an_explicit_none_floor():
+    # REPRODUCED: the README said "SEVERITY FLOOR: NONE" is documented +
+    # low_and_above while the schema said it is unknown + unstated.
+    schema = json.loads((ROOT / "schemas" / "ledger.schema.json").read_text(encoding="utf-8"))
+    shape_doc = schema["items"]["properties"]["tier_shape"]["description"]
+    assert "EXPLICITLY states 'SEVERITY FLOOR: NONE' or 'any' is 'low_and_above'" in shape_doc
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "| `SEVERITY FLOOR: NONE` or `SEVERITY FLOOR: any`, in those words | `documented` | `low_and_above` |" in readme
