@@ -28,12 +28,12 @@
           "low_and_above",
           "unknown"
         ],
-        "description": "Which severities the program pays. 'unknown' means the reward table has not been transcribed and MUST NOT be read as permissive. A program whose page states no floor at all ('NONE', 'any', or nothing) is ALSO 'unknown' until the reward table is read, because informational findings are acknowledged rather than paid and no floor statement is not evidence that Low pays; record that state in floor_status: unstated. There is deliberately no 'any' value."
+        "description": "Which severities the program pays. 'unknown' means the reward table has not been transcribed and MUST NOT be read as permissive. A page that SAYS NOTHING about a floor is also 'unknown', with floor_status: unstated - no floor statement is not evidence that Low pays. A page that EXPLICITLY states 'SEVERITY FLOOR: NONE' or 'any' is 'low_and_above' with floor_status: documented: the program has stated something, and since informational findings are acknowledged rather than paid, Low is the lowest tier that pays. There is deliberately no 'any' value."
       },
       "floor_status": {
         "type": "string",
         "enum": ["documented", "unstated", "conflicting"],
-        "description": "Whether the floor was READ. 'documented' = the reward table was read and its lowest paying tier recorded. 'unstated' = the page states no floor; this is not evidence that Low pays, it is evidence the page has not been read, so tier_shape stays 'unknown'. 'conflicting' = the program's own materials disagree about the floor; record both in 'conflicts'. Strongly recommended: the validator warns when it is absent."
+        "description": "Whether the floor was READ. 'documented' = the reward table was read and its lowest paying tier recorded, or the page explicitly states 'SEVERITY FLOOR: NONE / any' (record low_and_above). 'unstated' = the page says nothing about a floor; this is not evidence that Low pays, it is evidence the page has not been read, so tier_shape stays 'unknown'. 'conflicting' = the program's own materials disagree about the floor; tier_shape stays 'unknown' and both readings go in 'conflicts'. Strongly recommended: the validator warns when it is absent."
       },
       "floor_severity": {
         "type": ["string", "null"],

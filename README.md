@@ -30,7 +30,7 @@ current, and cited.
 
 ## What is in here
 
-`
+```text
 data/tier-shapes.yaml               the 5 tier shapes, with detection and risk notes
 data/clause-classes.yaml            the 14 exclusion-clause classes, with escape hatches
 data/gate-crossref.yaml             which catalog answers each viability-gate gate token
@@ -38,9 +38,13 @@ schemas/ledger.schema.json          JSON Schema (v1) for a private ledger
 scripts/validate.py                 validates a ledger; --taxonomy prints the vocabularies
 scripts/crossref.py                 gate token -> the catalog that reads the program page for it
 scripts/check_generic.py            fails if a taxonomy or the schema names a platform or a foreign repo
+scripts/check_hygiene.py            fails on mojibake, an identity token or a private path anywhere
+scripts/check_links.py              fails on a relative link in a document that does not resolve
+scripts/check_markdown.py           fails on a mangled code fence or a stale pinned tag
+scripts/token_scan.py               the chain / platform token vocabulary and its matcher
 examples/ledger.example.yaml        one fictional entry, showing the shape
 examples/tier-shapes.example.yaml   five fictional entries, one per tier shape
-`
+```
 
 Both vocabularies are **data**, not prose, so the documentation, the schema and the validator
 cannot drift apart. `validate.py` reads them at runtime.
@@ -122,7 +126,7 @@ paid nothing because the program's floor sat one tier above the finding:
 - A **valid Medium with a working proof, on a `high_and_above` program.** The accounting defect
   was reproduced and acknowledged; Medium had no reward row. Payout: zero. This shape produced
   the single most expensive entry in the log — correct work, zero return.
-- A **valid Low, on a `critical_only` program** (often labelled "DualDefense" or similar). Low was
+- A **valid Low, on a `critical_only` program** (one that labels itself critical-only). Low was
   real and reproduced; the table paid Critical only. Out of scope for payout.
 
 Two lessons I had to learn the expensive way:
@@ -178,11 +182,13 @@ differently everywhere and mean one of a dozen things. Classify each clause you 
 | `non_standard_token` | "fee-on-transfer/rebasing tokens" | Token-integration findings, unless listed |
 | `scope_boundary` | "only files under `src/` are in scope" | Root causes outside the named tree |
 
-Which classes actually waste submissions is a question about **your own** log. The numbers most
-often quoted next to these classes — duplicates at 37% of rejections, exclusion-clause mismatches
-at 27% — come from the author's private submission log. That is one researcher's log, **not an
-industry census**, and it is not reproducible from this repository. Treat it as a prior, not a
-number you can cite.
+Which classes actually waste submissions is a question about **your own** log. The author's
+log is published, classified, in
+[rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy): at v0.5.1 (113 rows),
+**38% of the rejections were duplicates (43/113) and 23% were out of scope (26/113)**, by its
+`triage_class` column. (Earlier versions of this README quoted 37% and 27%: the same log at 97
+rows.) That is one researcher's log, **not an industry census**. Treat it as a prior, not a
+number you can cite about anyone else.
 
 ### Sometimes argued: unknowing admin harm
 
@@ -213,7 +219,13 @@ protocol broke when the admin did their job." It is also not a reliable payout:
 Transcribe each clause as a **regex over your own finding description**, then run it. A match is a
 prompt to check, not an automatic reject — over-trusting a regex manufactures false negatives,
 which is its own expensive failure. [viability-gate](https://github.com/KhomDev/viability-gate)
-implements exactly this.
+0.5.0 and later run every exclusion `pattern` in your ledger over a draft's claim sections in
+gate G2 (`vg check`, or `vg gates --finding`). Earlier versions only checked that the patterns
+compiled.
+
+Write patterns both tools can read: viability-gate uses Rust's `regex` crate,
+case-insensitively, so **no lookaround and no backreferences**. `validate.py` rejects those, and
+it compiles every pattern case-insensitively, as viability-gate does.
 
 ## 3. Prior-audit surface
 
@@ -281,9 +293,11 @@ date object rather than a string, and the schema declares a string, so the valid
 any JSON-Schema consumer would reject the entry.
 
 `scripts/validate.py` checks a ledger against [`schemas/ledger.schema.json`](schemas/ledger.schema.json)
-and against the shipped taxonomies: required fields, closed vocabularies for `tier_shape`,
-`floor_status` and exclusion `class`, valid regexes, and a non-empty `source_url` +
-`retrieved` date on every entry. **An uncited entry fails validation** — including yours and mine.
+(with the `jsonschema` package: an unknown or misspelt key, a wrong type and a bad date format
+are errors) and against the shipped taxonomies: required fields, closed vocabularies for
+`tier_shape`, `floor_status` and exclusion `class`, regexes both tools can compile, and a
+non-empty `source_url` + `retrieved` date on every entry. **An uncited entry fails validation** —
+including yours and mine.
 
 ```bash
 python scripts/validate.py my-ledger.yaml          # your private ledger
@@ -311,16 +325,19 @@ It warns on the things that cost the most:
 - **`prior_audits[].covers` missing** — a report naming a file is not the same as covering your
   function.
 
-It **errors** on the contradictions: an unstated floor beside a shape other than `unknown`, a
-documented floor with no `floor_severity`, a documented floor beside `unknown`, a
+It **errors** on the contradictions: an unstated or conflicting floor beside a shape other than
+`unknown`, a documented floor with no `floor_severity`, a documented floor beside `unknown`, a
+`retrieved` date in the future, a pattern viability-gate cannot compile, an unknown key, a
 `schema_version` this validator does not implement, and of course a missing citation.
 
 It also flags a **floor conflict**: if `tier_shape` implies a floor of `medium` but
 `floor_severity` says `high`, one of them is wrong and it says so.
 
-Placeholder hosts (`example.invalid`, `localhost`, `todo`) are an **error** in a real ledger
-and a warning in a file named `*.example.yaml`, so the shipped examples validate while a
-copied-and-not-edited ledger does not.
+Placeholder hosts (`example.com`, `localhost`, any `*.invalid` host, or a host with a `todo` /
+`tbd` / `changeme` label) are an **error** in a real ledger and a warning in a file named
+`*.example.yaml`, so the shipped examples validate while a copied-and-not-edited ledger does not.
+The check reads the URL's host, so a real page whose path happens to contain "todo" is not
+flagged.
 
 ### Tests
 
@@ -350,35 +367,40 @@ so changing the root to a mapping would break a tool that reads the same ledger.
 | bounty-economics schema version | viability-gate ledger version | Status |
 |---|---|---|
 | v1 | ledger v1 (`vg init`) | current |
-| v1 | ledger v1, pre-versioning | entries with no `schema_version` are read as schema version 1; the validator warns if `floor_status` is absent |
+| v1 | ledger v1, pre-versioning | entries with no `schema_version` are read as schema version 1; the validator warns if `floor_status` is absent, and `vg` 0.5.0 fails G1 on it |
 
-`floor_status` and `schema_version` are **additive**. `vg` ignores fields it does not read,
-so a v1 ledger written here stays parseable by it — but note that `vg` will *silently ignore*
-`floor_status`, which is why the validator, not `vg`, is the thing that enforces the unstated
-floor rule.
+New fields are **additive**: `vg` ignores ledger fields it does not read, so a v1 ledger written
+here stays parseable by it. `vg` does read `floor_status`: its G1 gate fails an `unstated`,
+`conflicting` or missing floor. The validator is still the stricter of the two - it is the one
+that checks the schema, the citation and the shape/status contradictions.
 
 The pin lives in exactly one place: `PINNED_VG_TAG` in
 [tests/test_compat_viability_gate.py](tests/test_compat_viability_gate.py). That test checks both
 directions at the pinned tag — `vg init` output must satisfy this repo's schema once filled in,
-and a ledger this repo accepts must be readable by `vg` — and it **skips rather than fails**
-when the sibling checkout `../viability-gate` is absent, when the pinned tag has not been
-published, or when `git` is unavailable. The in-repo half of the contract (schema ↔ taxonomy ↔
-example) always runs. Set `VG_SIBLING` to point the test at a checkout under another folder name.
+and a ledger this repo accepts must be readable by `vg` and read the same way: an unstated floor
+fails `vg`'s G1, and every example exclusion pattern compiles in `vg`'s G2. Locally it **skips**
+when the sibling checkout `../viability-gate` is absent, when the pinned tag is missing, or when
+`git` or `cargo` is unavailable. **In CI it fails instead** (`BE_COMPAT_REQUIRED=1`), so a broken
+pin cannot pass silently. The in-repo half of the contract (schema ↔ taxonomy ↔ example) always
+runs. Set `VG_SIBLING` to point the test at a checkout under another folder name.
 
-> **Current state:** pinned to viability-gate `v0.4.4`. The cross-repo assertions **run** in CI,
-> and all of them pass at that tag. (The ledger format is unchanged since `v0.4.1`; `v0.4.2` to
-> `v0.4.4` were docs, CI and dependency releases.)
+> **Current state:** pinned to viability-gate `v0.5.0`, the release whose G2 runs ledger
+> exclusion patterns over a draft and whose G1 reads `floor_status`.
 
 ### Install
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install .            # or -e ".[dev]" for a working checkout
 bounty-econ-validate --taxonomy
 bounty-econ-validate my-ledger.yaml --format json
 ```
 
+The installed package is `bounty_economics`; the taxonomies and the schema ship inside it, so
+the command works from a plain install, not only from a checkout. (Before 0.5.0 only an editable
+install worked, and it installed top-level modules called `validate` and `check_generic`.)
+
 CI runs pytest, ruff, the taxonomy print, the genericity check, the placeholder-host negative
-test and the compatibility test on Python 3.10 through 3.13.
+test, a clean wheel install and the compatibility test, on Python 3.10 through 3.13.
 
 ## What this repo deliberately does not contain
 
@@ -394,7 +416,7 @@ The taxonomies are the contribution. The instances stay with whoever read the pa
 
 ## Composing with viability-gate: the gate cross-reference
 
-The three repos share one gate vocabulary. [viability-gate](https://github.com/KhomDev/viability-gate)
+The four repos share one gate vocabulary. [viability-gate](https://github.com/KhomDev/viability-gate)
 maps each of its anti-patterns onto a gate token — a fired rule is a statement *about* a gate. This
 repo closes the loop for the two gates that are decided by the **program's own terms** rather than by
 the finding's prose:
@@ -426,7 +448,7 @@ catalog reference resolvable.
 |---|---|---|
 | **bounty-economics** (this) | *Can this program pay for what I found?* | Taxonomies of program terms + ledger schema |
 | [rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy) | *Why do findings fail after submission?* | Outcome taxonomy + aggregate stats |
-| [viability-gate](https://github.com/KhomDev/viability-gate) | *Should I submit this specific draft?* | The CLI that runs both against your private inputs |
+| [viability-gate](https://github.com/KhomDev/viability-gate) | *Should I submit this specific draft?* | The CLI: scores a draft against its rule catalog and runs the gates over your private ledger (this repo's schema) |
 | [realism-gate](https://github.com/KhomDev/realism-gate) | *Does my PoC show what an attacker can do?* | A static checker for Foundry PoC tests |
 
 All four are methodology. None ships target data.
@@ -435,12 +457,12 @@ All four are methodology. None ships target data.
 
 - **This is a reading aid, not a measurement.** The taxonomies have not been validated against a
   labelled corpus of program pages, because no such corpus is shipped here.
-- **The rejection figures are not reproducible from this repository.** The 37% duplicates / 27%
-  exclusions split comes from the author's private submission log. It is not an industry census
-  and it is not something you should cite as one.
+- **The rejection figures describe one researcher.** The 38% duplicates / 23% out-of-scope split
+  is reproducible from the published rejection-taxonomy dataset, but it is one person's log, not
+  an industry census, and not something you should cite as one.
 - **The unknowing-admin-harm framing is unproven.** The author's log contains no successful
   instance; some programs exclude it explicitly via `human_error`.
-- **The cross-repo compatibility test covers one viability-gate tag** (`v0.4.4`). A later
+- **The cross-repo compatibility test covers one viability-gate tag** (`v0.5.0`). A later
   viability-gate release is only covered once the pin is bumped.
 - **No example has been checked against a real program page.** Every example uses the reserved
   `.invalid` TLD, and every program in them is invented.
@@ -466,7 +488,7 @@ change any license.
 |---|---|---|
 | `data/**` | MIT (`LICENSE`) | the two taxonomy data files |
 | `schemas/**` | MIT (`LICENSE`) | `ledger.schema.json` (schema v1) |
-| `scripts/**` | MIT (`LICENSE`) | `validate.py`, `check_generic.py` |
+| `scripts/**` | MIT (`LICENSE`) | the validator and the repository checks |
 | `tests/**` | MIT (`LICENSE`) | pytest suites |
 | `examples/**` | MIT (`LICENSE`) | fictional entries, `.invalid` hosts |
 | `.github/**` | MIT (`LICENSE`) | CI workflow and issue templates |
@@ -479,5 +501,6 @@ anything shipped here.
 ships no program names, no chains, no reward tables and no scope text from any third party.
 Program terms are the property of their programs; this repository grants no rights over them and
 reproduces none of them. (Until 0.3.0 this paragraph sat after the MIT text in `LICENSE`, which
-stopped GitHub from detecting the licence. [`LICENSE`](LICENSE) is now the MIT text alone.) `SECURITY.md` carries a contact placeholder that is deliberately
-unfilled — see that file.
+stopped GitHub from detecting the licence. [`LICENSE`](LICENSE) is now the MIT text alone.)
+Security reports go through GitHub's private vulnerability reporting; see
+[`SECURITY.md`](SECURITY.md).

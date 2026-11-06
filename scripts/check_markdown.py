@@ -11,6 +11,8 @@ inline code.
 What it checks:
 
   - No line in a tracked .md file starts with "`@".
+  - No line consists of a lone backtick. That is a fence with two backticks
+    missing, and GitHub renders the block under it as one run-on paragraph.
   - Every tracked .md file has an even number of ``` fence lines.
   - Every "bounty-economics/tree/vX.Y.Z" link in README.md names the version
     in pyproject.toml.
@@ -54,6 +56,11 @@ def main() -> int:
         if mangled:
             problems.append(
                 f"{rel}: {len(mangled)} line(s) start with '`@'; a code fence is three backticks"
+            )
+        lone = re.findall(r"^[ \t]*`[ \t]*$", text, re.MULTILINE)
+        if lone:
+            problems.append(
+                f"{rel}: {len(lone)} line(s) hold a lone backtick; a code fence is three backticks"
             )
         fences = re.findall(r"^\s*```", text, re.MULTILINE)
         if len(fences) % 2:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cross-reference a viability-gate gate token to this repo's program-terms catalog.
 
-The three repos share one gate vocabulary. viability-gate maps each anti-pattern
+The four repos share one gate vocabulary. viability-gate maps each anti-pattern
 onto a gate token (a fired rule -> the gate it is a statement about). This helper
 closes the loop for the two gates decided by the program's OWN TERMS: given a
 gate token, it prints the catalog in this repo that tells you how to read the

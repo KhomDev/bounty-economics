@@ -13,12 +13,15 @@ a **pinned tag** of the sibling, so a change over there cannot silently break th
 format here without failing a build:
 
   * forward — ``vg init`` output, once filled in, must satisfy this repo's schema.
-  * reverse — a ledger this repo accepts must be readable by ``vg``.
+  * reverse — a ledger this repo accepts must be readable by ``vg``, and read the
+    way we mean it: an unstated floor fails vg's G1, every pattern we accept
+    compiles in vg's G2, and vg's G2 runs our patterns over a draft.
 
-It SKIPS, with a specific reason, rather than failing, when the sibling checkout
-is absent, when the pinned tag has not been published, or when ``git`` / ``cargo`` is
-unavailable. A sibling repository that is merely *absent* is not a defect in this
-repo, and a red build for it would train people to ignore the signal.
+Locally it SKIPS, with a specific reason, when the sibling checkout is absent, when
+the pinned tag is missing, or when ``git`` / ``cargo`` is unavailable: a sibling
+that is merely absent from a contributor's machine is not a defect in this repo.
+With ``BE_COMPAT_REQUIRED=1`` (set in CI) every one of those reasons FAILS
+instead, so a broken pin can never pass silently.
 
 The pin lives in exactly one place: ``PINNED_VG_TAG`` below.
 
@@ -53,7 +56,7 @@ from validate import (  # noqa: E402
 
 # The single source of truth for the cross-repo pin. Bump it when viability-gate
 # publishes a tag that changes the ledger format or `vg init`.
-PINNED_VG_TAG = "v0.4.4"
+PINNED_VG_TAG = "v0.5.0"
 
 # The sibling checkout, relative to this repo. Both live under the same parent.
 # VG_SIBLING overrides it, for a checkout kept under a different folder name.
@@ -84,8 +87,11 @@ def _skip_reason() -> str | None:
     return None
 
 
+# CI sets this, so the contract is enforced there rather than skipped.
+REQUIRED = os.environ.get("BE_COMPAT_REQUIRED") == "1"
+
 requires_sibling = pytest.mark.skipif(
-    _skip_reason() is not None, reason=_skip_reason() or ""
+    not REQUIRED and _skip_reason() is not None, reason=_skip_reason() or ""
 )
 
 
@@ -99,6 +105,8 @@ def vg_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """
     reason = _skip_reason()
     if reason:
+        if REQUIRED:
+            pytest.fail(f"BE_COMPAT_REQUIRED=1 but the contract cannot run: {reason}")
         pytest.skip(reason)
 
     work = tmp_path_factory.mktemp("vg-pinned")
@@ -123,7 +131,7 @@ def vg_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
             tar.extractall(src)
 
     build = subprocess.run(
-        ["cargo", "build", "--quiet", "--manifest-path", str(src / "Cargo.toml")],
+        ["cargo", "build", "--quiet", "--locked", "--manifest-path", str(src / "Cargo.toml")],
         capture_output=True,
         text=True,
     )
@@ -159,11 +167,12 @@ def test_the_pin_looks_like_a_tag():
     assert re.match(r"^v\d+\.\d+\.\d+", PINNED_VG_TAG), PINNED_VG_TAG
 
 
-def test_the_skip_is_reported_rather_than_silent():
-    # Whichever way it goes here, the reason is a string, so the failure mode is
-    # "skipped: <why>" and never a silent pass.
-    reason = _skip_reason()
-    assert reason is None or isinstance(reason, str)
+def test_ci_requires_the_contract_rather_than_skipping_it():
+    # A skip in CI is a silent pass. The compat job must set the switch that
+    # turns every skip reason into a failure.
+    ci = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    env = ci["jobs"]["compat"].get("env") or {}
+    assert str(env.get("BE_COMPAT_REQUIRED")) == "1", env
 
 
 # ---------------------------------------------------------------- in-repo half
@@ -172,11 +181,21 @@ def test_the_skip_is_reported_rather_than_silent():
 # the examples, the schema and the taxonomies must agree with each other.
 
 
-def test_our_example_ledger_satisfies_our_schema():
+def test_our_examples_pass_our_validator():
+    # validate_entry checks the JSON Schema as well as the semantic rules.
     for path in sorted((ROOT / "examples").glob("*.yaml")):
         for i, entry in enumerate(yaml.safe_load(path.read_text(encoding="utf-8"))):
             errors, _ = validate_entry(entry, i, TIERS, CLAUSES, example_mode=True)
             assert errors == [], f"{path.name}: {errors}"
+
+
+def test_our_examples_satisfy_the_json_schema_directly():
+    import jsonschema
+
+    for path in sorted((ROOT / "examples").glob("*.yaml")):
+        jsonschema.validate(
+            instance=yaml.safe_load(path.read_text(encoding="utf-8")), schema=SCHEMA
+        )
 
 
 def test_our_schema_is_closed_and_versioned():
@@ -274,11 +293,12 @@ def test_our_example_ledger_is_readable_by_vg(vg_binary: Path, tmp_path: Path):
 
 @requires_sibling
 def test_vg_ignores_our_additive_fields_without_failing(vg_binary: Path, tmp_path: Path):
-    """Additive fields must not break the older reader.
+    """Fields vg does not model must not break it.
 
-    ``floor_status`` and ``schema_version`` are fields viability-gate's model does not
-    read. The contract is that they are additive: an old reader must ignore them,
-    not reject them. A ledger that fails here means the two repos have diverged.
+    ``schema_version`` and ``notes`` are fields viability-gate's model does not read
+    (it does read ``floor_status``). The contract is that new fields are additive:
+    a reader must ignore them, not reject them. A ledger that fails here means the
+    two repos have diverged.
     """
     ledger = tmp_path / "additive.yaml"
     ledger.write_text(
@@ -288,7 +308,8 @@ def test_vg_ignores_our_additive_fields_without_failing(vg_binary: Path, tmp_pat
         "  floor_status: documented\n"
         "  floor_severity: medium\n"
         "  source_url: https://real.example.org/rewards\n"
-        "  retrieved: 2026-10-01\n",
+        "  retrieved: 2026-10-01\n"
+        "  notes: \"a free-text note\"\n",
         encoding="utf-8",
     )
     out = subprocess.run(
@@ -299,3 +320,94 @@ def test_vg_ignores_our_additive_fields_without_failing(vg_binary: Path, tmp_pat
     assert out.returncode != 2, (
         f"vg rejected a ledger carrying our additive fields:\n{out.stderr}"
     )
+
+
+# ---------------------------------------------------------------- semantics
+#
+# Parsing is not agreement. These check that vg reads a ledger the way this
+# repository means it.
+
+
+def _gates(vg_binary: Path, *args: str) -> dict[str, dict]:
+    out = subprocess.run(
+        [str(vg_binary), "gates", *args, "--json"], capture_output=True, text=True
+    )
+    assert out.returncode in (0, 1), f"vg gates failed:\n{out.stderr}"
+    return {g["gate"]: g for g in json.loads(out.stdout)}
+
+
+def _one_entry_ledger(tmp_path: Path, body: str) -> Path:
+    ledger = tmp_path / "ledger.yaml"
+    ledger.write_text(body, encoding="utf-8")
+    return ledger
+
+
+@requires_sibling
+def test_vg_fails_an_unstated_floor(vg_binary: Path, tmp_path: Path):
+    # The rule this repository exists to enforce: an unstated floor is not Low.
+    errors, _ = validate_entry(
+        {
+            "id": "unstated",
+            "tier_shape": "unknown",
+            "floor_status": "unstated",
+            "floor_severity": None,
+            "source_url": "https://real.example.org/rewards",
+            "retrieved": "2026-10-01",
+        },
+        0,
+        TIERS,
+        CLAUSES,
+    )
+    assert errors == [], errors
+    ledger = _one_entry_ledger(
+        tmp_path,
+        "- id: unstated\n  tier_shape: unknown\n  floor_status: unstated\n"
+        "  floor_severity: null\n  source_url: \"https://real.example.org/rewards\"\n"
+        "  retrieved: \"2026-10-01\"\n",
+    )
+    g1 = _gates(vg_binary, "--ledger", str(ledger))["G1"]
+    assert g1["status"] == "fail", g1
+
+
+@requires_sibling
+def test_every_pattern_we_ship_compiles_in_vg(vg_binary: Path, tmp_path: Path):
+    # The example ledger's patterns and every suggested_pattern in the clause
+    # taxonomy: validate.py accepts them, so vg's G2 must compile them too.
+    lines = [
+        "- id: patterns",
+        "  tier_shape: medium_and_above",
+        "  floor_status: documented",
+        "  floor_severity: medium",
+        "  source_url: \"https://real.example.org/rewards\"",
+        "  retrieved: \"2026-10-01\"",
+        "  exclusions:",
+    ]
+    example = yaml.safe_load((ROOT / "examples" / "ledger.example.yaml").read_text(encoding="utf-8"))
+    patterns = [(x["class"], x["pattern"]) for x in example[0]["exclusions"] if x.get("pattern")]
+    patterns += [(cid, c["suggested_pattern"]) for cid, c in CLAUSES.items() if c.get("suggested_pattern")]
+    for klass, pattern in patterns:
+        lines += [
+            f"    - class: {klass}",
+            "      clause: \"verbatim clause\"",
+            f"      pattern: {json.dumps(pattern)}",
+        ]
+    ledger = _one_entry_ledger(tmp_path, "\n".join(lines) + "\n")
+    g2 = _gates(vg_binary, "--ledger", str(ledger))["G2"]
+    assert g2["status"] == "pass", g2
+
+
+@requires_sibling
+def test_vg_runs_our_exclusion_patterns_over_a_draft(vg_binary: Path, tmp_path: Path):
+    ledger = _one_entry_ledger(
+        tmp_path,
+        "- id: g2\n  tier_shape: medium_and_above\n  floor_status: documented\n"
+        "  floor_severity: medium\n  source_url: \"https://real.example.org/rewards\"\n"
+        "  retrieved: \"2026-10-01\"\n  exclusions:\n    - class: privileged_role\n"
+        "      clause: \"Attacks requiring privileged access\"\n"
+        "      pattern: \"(owner|admin) (can|must)\"\n",
+    )
+    draft = tmp_path / "draft.md"
+    draft.write_text("The admin can drain the pool by setting the fee.\n", encoding="utf-8")
+    g2 = _gates(vg_binary, "--ledger", str(ledger), "--finding", str(draft))["G2"]
+    assert g2["status"] == "fail", g2
+    assert "privileged_role" in g2["detail"], g2

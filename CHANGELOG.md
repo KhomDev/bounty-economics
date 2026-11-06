@@ -28,6 +28,71 @@ The tree itself is unchanged except for the tripwire fix recorded here.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-06
+
+The audit release. A 2026-11-06 audit reproduced each defect below with the 0.4.1 validator;
+each is now a test in `tests/test_validate.py` or `tests/test_compat_viability_gate.py`.
+
+### Removed
+
+- **A platform product name.** The README, `data/tier-shapes.yaml` and this changelog named a
+  bug-bounty platform's critical-only audit product. A product name identifies its platform as
+  surely as the platform's own name does, against this repository's promise to ship no platform
+  names. Per `SECURITY.md`, the removed text is not repeated here. The text is replaced, and `scripts/token_scan.py` now lists platform product
+  names and platform rule terms, so `check_generic.py` and `check_hygiene.py` catch the class.
+  Earlier tags still contain the old text; git history is not rewritten here.
+
+### Fixed
+
+- **The validator now enforces `schemas/ledger.schema.json`.** It used to define the schema
+  path and never load it, so a misspelt key (`exclusionz:`), a nested typo or a wrong type
+  passed while any JSON Schema consumer rejected the file. `jsonschema` is now a dependency.
+- **Explicit "SEVERITY FLOOR: NONE" has one answer.** The README said `documented` +
+  `low_and_above`; the schema's `tier_shape` description said `unknown` + `unstated`; two
+  validator messages said "use low if the program documents no floor", which read either way.
+  All of them now say: a page that EXPLICITLY states no floor is `low_and_above` /
+  `documented`; a page that says NOTHING about a floor is `unknown` / `unstated`.
+- **Exclusion patterns must be readable by both tools.** The validator compiled them with
+  Python `re`; viability-gate compiles them with Rust `regex`, case-insensitively. A lookbehind
+  passed here and failed viability-gate's G2 as an invalid regex. Lookaround, backreferences,
+  atomic groups and possessive quantifiers are now errors, and patterns compile
+  case-insensitively here too.
+- **`pip install .` produced a broken command.** `bounty-econ-validate` printed "taxonomy files
+  missing" from any non-editable install, because the data was not packaged; the install also
+  put top-level modules called `validate` and `check_generic` into site-packages, where
+  `validate` collides with other packages' modules. The package is now `bounty_economics`, with
+  the taxonomies and the schema as package data. CI installs the wheel into a clean venv and
+  runs it from outside the checkout.
+- **Placeholder detection read the whole URL.** A real `source_url` containing "todo" (say,
+  a repository called `todo-list`) was an error. The check now reads the host: `example.com`,
+  `localhost`, any `*.invalid` host, or a `todo` / `tbd` / `changeme` host label.
+- **A future `retrieved` date** is an error.
+- **A conflicting floor beside a settled shape** is an error, as the README's table already
+  said; it was a warning, while viability-gate fails it.
+- **README "What is in here"** used lone backticks instead of a code fence, so GitHub rendered
+  the block as one paragraph, and it listed four of the eight scripts. `check_markdown.py` now
+  fails on a lone-backtick line.
+- **False cross-repo claims** corrected: viability-gate does read `floor_status` (its G1 fails
+  an unstated, conflicting or missing floor); "viability-gate implements exactly this" is now
+  true only from viability-gate 0.5.0, whose G2 runs ledger patterns over a draft, and the
+  README says so; "three repos" is four.
+- **Rejection figures**: the "37% duplicates / 27% exclusions, not reproducible" sentence is
+  replaced by the reproducible figures from rejection-taxonomy v0.5.1: 38% duplicates (43/113),
+  23% out of scope (26/113).
+- `prior_audits[].url` missing is now a warning, matching viability-gate's note.
+- `.gitattributes` began with a UTF-8 byte-order mark, so its `* text=auto eol=lf` line matched
+  no file. The mark is removed.
+
+### Changed
+
+- **The compat test is pinned to viability-gate `v0.5.0`** and checks semantics, not only
+  parsing: an unstated floor fails vg's G1, every shipped and suggested pattern compiles in vg's
+  G2, and vg's G2 runs a ledger pattern over a draft. In CI (`BE_COMPAT_REQUIRED=1`) a missing
+  sibling, tag or toolchain fails instead of skipping. A tautological test is removed.
+- CI installs exact tool versions from `requirements-ci.txt`.
+- `SECURITY.md` routes reports through GitHub private vulnerability reporting; the unfilled
+  contact placeholder and the advice to open a public issue are gone.
+
 ## [0.4.1] — 2026-11-05
 
 A maintenance release. Taxonomies, schema and ledger format are unchanged.
@@ -85,7 +150,7 @@ already in `data/clause-classes.yaml` or a payout-tier structure not already in
 `data/tier-shapes.yaml`.
 
 **They did not.** Every floor rejection resolved to one of the five existing shapes
-(`critical_only` for the DualDefense / Critical-only programs, `high_and_above` for the valid
+(`critical_only` for the critical-only programs, `high_and_above` for the valid
 Mediums that paid nothing), and every exclusion rejection mapped to one of the fourteen existing
 classes (`privileged_role`, `human_error`, `admin_input`, `dos_no_extraction`, `front_run_only`,
 `best_practice`, `design_issue`, `testing_limits`, `user_input`, `non_standard_token`, and the
@@ -216,7 +281,8 @@ floor, that entry is now an **error**: set `tier_shape: unknown` and
 - The `any` tier shape was removed: a program documenting no severity floor is `low_and_above`.
   (Superseded — see the unstated-floor fix above.)
 
-[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/KhomDev/bounty-economics/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/KhomDev/bounty-economics/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/KhomDev/bounty-economics/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/KhomDev/bounty-economics/compare/v0.2.0...v0.3.0
