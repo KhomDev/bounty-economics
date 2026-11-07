@@ -21,7 +21,7 @@ why CI has a job that builds a Rust binary from a sibling repository.
 
 ## Repository layout
 
-Nine directories and the repository root, each with one job:
+Eight directories and the repository root, each with one job:
 
 | Path | Role |
 |---|---|
@@ -32,6 +32,7 @@ Nine directories and the repository root, each with one job:
 | `tests/` | Six pytest suites, 132 collected tests: [test_validate.py](tests/test_validate.py) (validator behaviour), [test_counts.py](tests/test_counts.py) (count/vocabulary drift), [test_compat_viability_gate.py](tests/test_compat_viability_gate.py) (the cross-repo contract), [test_crossref.py](tests/test_crossref.py), [test_generic.py](tests/test_generic.py), [test_token_scan.py](tests/test_token_scan.py). |
 | `.github/workflows/` | [ci.yml](.github/workflows/ci.yml): the two CI jobs, `validate` and `compat`. |
 | `.github/ISSUE_TEMPLATE/` | [correction.md](.github/ISSUE_TEMPLATE/correction.md) and [takedown-request.md](.github/ISSUE_TEMPLATE/takedown-request.md): structured intake for "a claim is wrong" and "this text identifies a target". |
+| `.github/` | [dependabot.yml](.github/dependabot.yml): weekly, grouped bump PRs for the pinned Python tools (pip) and the GitHub Actions versions (github-actions). |
 | Root | [README.md](README.md) (the method, the schema docs, the cross-repo matrix), [CHANGELOG.md](CHANGELOG.md) (Keep-a-Changelog, versions track the ledger schema), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CITATION.cff](CITATION.cff) (version 0.5.0, released 2026-11-06), [LICENSE](LICENSE) (MIT), `pyproject.toml`, `requirements-ci.txt`, `.gitattributes`, `.gitignore`. |
 
 Two conventions shape the whole tree:
@@ -59,7 +60,7 @@ of the same file (README.md:362-365, CONTRIBUTING.md:55-57). `$id` is
 **Entry object** (`items`, lines 7-125). `additionalProperties: false` (line 9) — a key the
 schema does not list is an error, not a warning; `required` is exactly
 `["id", "tier_shape", "source_url", "retrieved"]` (line 10), asserted at
-tests/test_counts.py:188-194. Twelve properties (lines 11-124):
+tests/test_counts.py:188-189, and the closed-to-unknown-fields rule at 191-193. Twelve properties (lines 11-124):
 
 1. **`schema_version`** (12-16) — integer, `const: 1`. Optional; absent means 1. "A validator
    that does not implement the pinned version must reject the entry rather than mis-read it."
@@ -88,7 +89,7 @@ tests/test_counts.py:188-194. Twelve properties (lines 11-124):
    - **`clause`** (85-89) — string, `minLength: 1`, "Verbatim from the program's scope page."
    - **`pattern`** (90-93) — string, optional; case-insensitive regex over your own finding
      description. "A match is a prompt to check, not an automatic reject."
-10. **`prior_audits`** (97-118) — array of objects, each closed (100) with required `["firm"]`
+10. **`prior_audits`** (97-118) — array of objects, each closed (101) with required `["firm"]`
     (102) and four properties: **`firm`** (104, string), **`url`** (105, string),
     **`covers`** (106-110, array of strings — files and functions covered), **`known_issues`**
     (111-115, array of strings, the program's own list verbatim).
@@ -100,7 +101,7 @@ tests/test_counts.py:188-194. Twelve properties (lines 11-124):
 `test_the_schema_tier_enum_matches_the_taxonomy` (tests/test_counts.py:168-171) and
 `test_the_schema_clause_enum_matches_the_taxonomy` (173-176) assert the enums equal `list(TIERS)`
 and `list(CLAUSES)` as loaded from the data files; `test_the_schema_floor_status_enum_matches_the_validator`
-(178-181) and the floor-severity twin (183-186) pin the same for the validator's tuples;
+(178-181) and the floor-severity twin (183-185) pin the same for the validator's tuples;
 `test_the_schema_declares_the_current_version` (163-166) pins `schema_version.const == 1` to the
 validator's `SCHEMA_VERSION`; `test_the_shipped_examples_validate_against_the_json_schema`
 (197-204) runs both examples through raw `jsonschema.validate`, and two negative tests
@@ -113,7 +114,7 @@ Two repositories read the same private ledger file. The contract, as the code st
 > bounty-economics (this repo) owns the schema: schemas/ledger.schema.json, plus the validator and
 > the taxonomies. viability-gate (../viability-gate) owns the CLI. Its vg init scaffolds a ledger,
 > and its LedgerEntry model deserializes one. Nothing enforces that those two agree except this
-> file. — tests/test_compat_viability_gate.py:4-13
+> file. — tests/test_compat_viability_gate.py:6-13
 
 "One dialect" is enforced mechanically, at a pinned tag, in both directions:
 
@@ -169,7 +170,8 @@ Two load-bearing comment blocks: the removal rationale for the `any` shape under
 `low_and_above` (82-97) — "A shape that reads as a green light is worse than no shape" — and the
 `unknown` entry itself, whose `risk` field says "THE DANGEROUS VALUE" (105-108). The 0.5.0
 release removed a platform product name from the `critical_only` detection signals
-(data/tier-shapes.yaml:35); the identity token now lives only in `scripts/token_scan.py` and in
+(line 35 of the 0.4.x file; the rewritten wording is data/tier-shapes.yaml:37 today); the
+identity token now lives only in `scripts/token_scan.py` and in
 git history (see
 [The repository guards](#the-repository-guards)).
 
@@ -216,7 +218,7 @@ Header (1-19): the four repos share one gate vocabulary (documented in
 rejection-taxonomy/data/SCHEMA.md and used by viability-gate); viability-gate's mapping runs one
 way (anti-pattern → gate token); this file closes the loop from the other side for the gates
 decided by the program's own terms. "It is a JUDGEMENT about which catalog answers a gate … not a
-re-derivation against any dataset" (16-19). Two mappings:
+re-derivation against any dataset" (17-19). Two mappings:
 
 - `answered_here` (25-52): five gates. `G1_severity_floor`, `program_ceiling` and
   `P16_below_floor` → catalog `tier-shapes`; `G2_exclusion_clause` → `clause-classes`;
