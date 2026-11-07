@@ -46,6 +46,9 @@ examples/ledger.example.yaml        one fictional entry, showing the shape
 examples/tier-shapes.example.yaml   five fictional entries, one per tier shape
 ```
 
+For a line-level walkthrough of the schema, the data files, the scripts, the tests and CI, see
+[CODE_GUIDE.md](CODE_GUIDE.md).
+
 Both vocabularies are **data**, not prose, so the documentation, the schema and the validator
 cannot drift apart. `validate.py` reads them at runtime.
 
