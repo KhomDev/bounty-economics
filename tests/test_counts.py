@@ -94,6 +94,12 @@ def test_the_unstated_example_keeps_tier_shape_unknown():
 # ---------------------------------------------------------------- the README
 
 
+def test_markdown_check_accepts_the_tree():
+    import check_markdown
+
+    assert check_markdown.main() == 0
+
+
 def test_the_validate_script_runner_exits_zero():
     # README: `python tests/test_validate.py` runs the fixture-free tests.
     # Parametrized cases used to be called with no arguments, so the command

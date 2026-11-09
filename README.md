@@ -42,6 +42,7 @@ scripts/check_hygiene.py            fails on mojibake, an identity token or a pr
 scripts/check_links.py              fails on a relative link in a document that does not resolve
 scripts/check_markdown.py           fails on a mangled code fence or a stale pinned tag
 scripts/token_scan.py               the chain / platform token vocabulary and its matcher
+scripts/__init__.py                 package marker for the installable `bounty_economics`
 examples/ledger.example.yaml        one fictional entry, showing the shape
 examples/tier-shapes.example.yaml   five fictional entries, one per tier shape
 ```
@@ -166,7 +167,7 @@ earns nothing.
 ## 2. Exclusion clause classes
 
 Almost every program's scope page carries a list of out-of-scope categories. They are worded
-differently everywhere and mean one of a dozen things. Classify each clause you find:
+differently everywhere and mean one of fourteen things. Classify each clause you find:
 
 | Class | Typical wording | What it kills |
 |---|---|---|
@@ -187,11 +188,11 @@ differently everywhere and mean one of a dozen things. Classify each clause you 
 
 Which classes actually waste submissions is a question about **your own** log. The author's
 log is published, classified, in
-[rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy): at v0.5.1 (113 rows),
-**38% of the rejections were duplicates (43/113) and 23% were out of scope (26/113)**, by its
-`triage_class` column. (Earlier versions of this README quoted 37% and 27%: the same log at 97
-rows.) That is one researcher's log, **not an industry census**. Treat it as a prior, not a
-number you can cite about anyone else.
+[rejection-taxonomy](https://github.com/KhomDev/rejection-taxonomy): at v0.6.0 (113 rows),
+**38.1% of the rejections were duplicates (43/113) and 23.0% were out of scope (26/113)**, by its
+`triage_class` column. v0.6.0 did not change those triage counts. (Earlier versions of this
+README quoted 37% and 27%: the same log at 97 rows.) That is one researcher's log, **not an
+industry census**. Treat it as a prior, not a number you can cite about anyone else.
 
 ### Sometimes argued: unknowing admin harm
 
@@ -357,7 +358,7 @@ python -m pytest tests/ -q          # the full suite
 python tests/test_validate.py       # fixture-free tests from that file; pytest is optional
 ```
 
-Four suites:
+Six suites:
 
 - `tests/test_validate.py` — the validator's behaviour: an uncited entry fails, a placeholder
   host fails outside example mode, the removed `any` shape gets a migration message, an unstated
@@ -367,6 +368,9 @@ Four suites:
   quote the same counts and the same vocabularies. This is the suite that keeps the counts in
   this README tied to the files they describe.
 - `tests/test_generic.py` — the shipped taxonomies name no platform and no foreign repository.
+- `tests/test_crossref.py` — every shared gate token is classified, and every catalog reference
+  resolves.
+- `tests/test_token_scan.py` — the identity-token matcher, in both directions.
 - `tests/test_compat_viability_gate.py` — the cross-repo contract below.
 
 ### Schema and cross-repo version matrix
@@ -469,9 +473,10 @@ All four are methodology. None ships target data.
 
 - **This is a reading aid, not a measurement.** The taxonomies have not been validated against a
   labelled corpus of program pages, because no such corpus is shipped here.
-- **The rejection figures describe one researcher.** The 38% duplicates / 23% out-of-scope split
-  is reproducible from the published rejection-taxonomy dataset, but it is one person's log, not
-  an industry census, and not something you should cite as one.
+- **The rejection figures describe one researcher.** The 38.1% duplicates / 23.0% out-of-scope
+  split (43/113 and 26/113) is reproducible from the published rejection-taxonomy dataset at
+  v0.6.0, but it is one person's log, not an industry census, and not something you should cite
+  as one.
 - **The unknowing-admin-harm framing is unproven.** The author's log contains no successful
   instance; some programs exclude it explicitly via `human_error`.
 - **The cross-repo compatibility test covers one viability-gate tag** (`v0.5.0`). A later
@@ -498,13 +503,13 @@ change any license.
 
 | Path | License | Notes |
 |---|---|---|
-| `data/**` | MIT (`LICENSE`) | the two taxonomy data files |
+| `data/**` | MIT (`LICENSE`) | tier shapes, clause classes, and the gate cross-reference |
 | `schemas/**` | MIT (`LICENSE`) | `ledger.schema.json` (schema v1) |
 | `scripts/**` | MIT (`LICENSE`) | the validator and the repository checks |
 | `tests/**` | MIT (`LICENSE`) | pytest suites |
 | `examples/**` | MIT (`LICENSE`) | fictional entries, `.invalid` hosts |
 | `.github/**` | MIT (`LICENSE`) | CI workflow and issue templates |
-| `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CITATION.cff` | MIT (`LICENSE`) | documentation |
+| `README.md`, `CODE_GUIDE.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CITATION.cff` | MIT (`LICENSE`) | documentation |
 
 No third-party program data is included or redistributed, so no third-party license applies to
 anything shipped here.

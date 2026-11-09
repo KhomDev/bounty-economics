@@ -29,7 +29,7 @@ reporting.
 
 ## Scope
 
-In scope: ```scripts/**```, `schemas/**`, `data/**`, `examples/**`, ```.github/**```.
+In scope: `scripts/**`, `schemas/**`, `data/**`, `examples/**`, `.github/**`.
 
 Out of scope: the accuracy of the taxonomies as advice (that is a correction — see the issue
 template), and anything about a program you are hunting (this project has no relationship with any

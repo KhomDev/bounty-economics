@@ -1,7 +1,7 @@
 version: 2
 updates:
-  # Python tooling. The only runtime dependency is PyYAML, declared in
-  # pyproject.toml; updates are grouped into one pull request.
+  # Python tooling. Runtime dependencies are PyYAML and jsonschema, declared
+  # in pyproject.toml; updates are grouped into one pull request.
   - package-ecosystem: pip
     directory: "/"
     schedule:

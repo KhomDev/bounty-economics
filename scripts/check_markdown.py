@@ -16,6 +16,8 @@ What it checks:
   - Every tracked .md file has an even number of ``` fence lines.
   - Every "bounty-economics/tree/vX.Y.Z" link in README.md names the version
     in pyproject.toml.
+  - CITATION.cff's version, and the latest CHANGELOG heading, are that same
+    version.
 
 Run: python scripts/check_markdown.py
 Exit code 0 = clean, 1 = a problem, 2 = could not run.
@@ -71,17 +73,28 @@ def main() -> int:
     if not vm:
         print("check_markdown: no version in pyproject.toml", file=sys.stderr)
         return 2
+    version = vm.group(1)
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     for tag in sorted(set(re.findall(r"bounty-economics/tree/(v[\w.\-]+)", readme))):
-        if tag != "v" + vm.group(1):
-            problems.append(f"README.md pins {tag} but pyproject.toml is {vm.group(1)}")
+        if tag != "v" + version:
+            problems.append(f"README.md pins {tag} but pyproject.toml is {version}")
+    citation = (REPO_ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    cm = re.search(r'^version:\s*"([^"]+)"', citation, re.MULTILINE)
+    if not cm or cm.group(1) != version:
+        got = cm.group(1) if cm else "missing"
+        problems.append(f"CITATION.cff version is {got} but pyproject.toml is {version}")
+    changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    heads = re.findall(r"^## \[(\d+\.\d+\.\d+)\]", changelog, re.MULTILINE)
+    if not heads or heads[0] != version:
+        got = heads[0] if heads else "missing"
+        problems.append(f"CHANGELOG.md latest heading is {got} but pyproject.toml is {version}")
 
     if problems:
         print(f"check_markdown: {len(problems)} problem(s)")
         for p in problems:
             print("  " + p)
         return 1
-    print("check_markdown: fences well formed, pinned tag matches pyproject.toml")
+    print("check_markdown: fences well formed; README pin, citation and changelog match pyproject.toml")
     return 0
 
 
