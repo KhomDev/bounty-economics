@@ -83,6 +83,24 @@ def test_the_genericity_check_catches_each_platform_token():
         assert check_generic.scan(f"a program on {token}") != [], token
 
 
+def test_a_utf8_bom_is_an_encoding_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(check_hygiene, "ROOT", tmp_path)
+    path = tmp_path / "notes.md"
+    path.write_bytes(b"\xef\xbb\xbf# title\n")
+    problems = check_hygiene.check_encoding([path])
+    assert any("BOM" in problem for problem in problems), problems
+
+
+def test_invalid_utf8_is_an_encoding_error(tmp_path, monkeypatch):
+    # A cp1252 file used to be skipped: the reader caught UnicodeDecodeError
+    # and continued, so the encoding check passed the file it exists to catch.
+    monkeypatch.setattr(check_hygiene, "ROOT", tmp_path)
+    path = tmp_path / "notes.md"
+    path.write_bytes(b"caf\xe9\n")
+    problems = check_hygiene.check_encoding([path])
+    assert any("invalid UTF-8" in problem for problem in problems), problems
+
+
 def test_the_hygiene_check_reports_a_token_in_a_temporary_tree(tmp_path, monkeypatch):
     token = token_scan.TOKENS[0]
     leak = tmp_path / "leak.md"

@@ -6,7 +6,9 @@ against naming a platform. This guards the whole repository, including the prose
 and the scripts, against the two other ways a disclosure gets in:
 
 1. **Encoding.** A UTF-8 em dash re-saved as cp1252 is invisible in a diff and
-   wrong in every renderer. The byte sequences are checked directly.
+   wrong in every renderer. The check reads bytes: a leading UTF-8 BOM, a file
+   that is not valid UTF-8, and the mojibake sequences that show up once those
+   bytes have been decoded as cp1252 and saved again as UTF-8.
 2. **Identity tokens.** A chain, ecosystem or platform name says something about
    the author's targets. This repository promises methodology, not instances.
 3. **Private paths.** A path from the author's private workspace must never reach
@@ -107,10 +109,21 @@ def rel(path: Path) -> str:
 
 def check_encoding(files: list[Path]) -> list[str]:
     problems = []
+    bom = b"\xef\xbb\xbf"
     for path in files:
         try:
-            text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        if raw.startswith(bom):
+            # A BOM makes the first line not match `.gitattributes` rules and
+            # prefixes the first character for every reader that does not strip
+            # it. This repository already shipped one, on `.gitattributes`.
+            problems.append(f"{rel(path)}:1: UTF-8 BOM - remove it")
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError as err:
+            problems.append(f"{rel(path)}: invalid UTF-8 ({err})")
             continue
         for seq in MOJIBAKE:
             if seq in text:
