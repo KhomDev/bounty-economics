@@ -448,9 +448,9 @@ The two load-bearing mappings are `G1_severity_floor → tier-shapes` (the rewar
 `G2_exclusion_clause → clause-classes` (the scope page); `program_ceiling` and `P16_below_floor`
 also resolve to tier-shapes, and `G4_prior_audit` points at the prior-audit surface this repo
 documents in prose. The cross-reference is deliberately **honest about its edges**: gates whose
-signal is not in the program's terms (`D1_duplicate_check`, `G3_scope_tree`, `P17_no_attacker_win`
-and the rest) are listed as *not answered here*, with a note saying where the signal actually
-lives. `tests/test_crossref.py` keeps every gate token inside the shared vocabulary and every
+signal is not in the program's terms (`D1_duplicate_check`, `G3_scope_tree`, `design_review`,
+`P17_no_attacker_win` and the rest) are listed as *not answered here*, with a note saying where
+the signal actually lives. `tests/test_crossref.py` keeps every gate token inside the shared vocabulary and every
 catalog reference resolvable.
 
 ## How this relates to the other repos
