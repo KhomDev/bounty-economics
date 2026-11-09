@@ -2,5 +2,5 @@
 # overnight. Dependabot (pip, "/") proposes the bumps.
 PyYAML==6.0.3
 jsonschema==4.26.0
-pytest==9.1.1
-ruff==0.17.0
+pytest==9.2.0
+ruff==0.17.4
