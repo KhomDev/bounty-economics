@@ -9,6 +9,7 @@ listed in both halves, or a helper that errors on a gate it claims to know.
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -78,6 +79,56 @@ def test_catalog_references_resolve_to_real_entries(cross):
         if catalog in sizes:
             assert sizes[catalog] > 0, f"{gate} -> {catalog} resolves to no entries"
             assert catalog_entries(catalog), f"{gate} -> {catalog} returned no ids"
+
+
+def test_every_shared_gate_is_classified(cross):
+    # A token in the shared vocabulary that is in neither half is reported as
+    # "unknown" — design_review was that hole. Honesty about the edges means
+    # every gate is either answered here or explicitly not.
+    gates = set(cross.get("answered_here", {})) | set(cross.get("not_program_terms", {}))
+    missing = sorted(VALID_GATES - gates)
+    assert not missing, f"shared gate(s) missing from the cross-reference: {missing}"
+
+
+def test_design_review_is_not_a_program_terms_gate(cross):
+    assert "design_review" in cross["not_program_terms"]
+    assert "G2_exclusion_clause" in cross["not_program_terms"]["design_review"]
+
+
+def test_crossref_reads_the_validator_data_root():
+    from crossref import CROSSREF_FILE
+    from validate import ROOT
+
+    assert CROSSREF_FILE == ROOT / "data" / "gate-crossref.yaml"
+    assert CROSSREF_FILE.is_file()
+
+
+def test_json_format_resolves_one_gate_and_rejects_an_unknown_one():
+    script = ROOT / "scripts" / "crossref.py"
+    one = subprocess.run(
+        [sys.executable, str(script), "G2_exclusion_clause", "--format", "json"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    assert one.returncode == 0, one.stderr
+    payload = json.loads(one.stdout)
+    assert payload["gate"] == "G2_exclusion_clause"
+    assert payload["answered"] is True
+    assert payload["catalog"] == "clause-classes"
+    assert len(payload["entries"]) == 14
+
+    bad = subprocess.run(
+        [sys.executable, str(script), "NOT_A_GATE", "--format", "json"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    assert bad.returncode != 0
+    error = json.loads(bad.stdout)
+    assert error["ok"] is False
+    assert "NOT_A_GATE" in error["error"]
+    assert "design_review" in error["known"]
 
 
 def test_the_two_core_mappings_are_present(cross):

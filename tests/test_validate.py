@@ -3,7 +3,7 @@
 
 Run:
     python -m pytest tests/ -q
-    python tests/test_validate.py          # no pytest required
+    python tests/test_validate.py          # fixture-free tests; pytest is optional
 
 These pin the behaviours that matter and keep the taxonomies in sync with the
 validator. A validator that silently accepts an uncited floor is worse than no
@@ -12,12 +12,28 @@ validator, because you will trust the entry.
 
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 from datetime import date
 from pathlib import Path
 
-import pytest
+try:
+    import pytest
+except ImportError:  # `python tests/test_validate.py` does not require pytest
+    pytest = None
+
+
+def _parametrize(names, values):
+    """pytest.mark.parametrize when pytest is installed, otherwise recorded cases."""
+
+    def deco(fn):
+        fn._be_cases = (names, list(values))
+        return fn
+
+    if pytest is None:
+        return deco
+    return pytest.mark.parametrize(names, values)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -42,7 +58,7 @@ def entry(**over: object) -> dict:
         "tier_shape": "medium_and_above",
         "floor_status": "documented",
         "floor_severity": "medium",
-        "source_url": "https://real.example.org/rewards",
+        "source_url": "https://docs.real-program.org/rewards",
         "retrieved": "2026-10-01",
     }
     base.update(over)
@@ -452,30 +468,69 @@ def test_strict_promotes_warnings_in_json_too(capsys):
 # ---------------------------------------------------------------- runner
 
 
+_FIXTURES = {"capsys", "tmp_path", "monkeypatch", "tmp_path_factory"}
+
+
+def _cases(fn):
+    """Argument sets for a parametrized test, or a single empty call."""
+    stored = getattr(fn, "_be_cases", None)
+    marks = getattr(fn, "pytestmark", [])
+    if not isinstance(marks, list):
+        marks = [marks]
+    for mark in marks:
+        if getattr(mark, "name", None) == "parametrize":
+            argnames = mark.args[0]
+            names = [part.strip() for part in argnames.split(",")] if isinstance(argnames, str) else list(argnames)
+            stored = (names, list(mark.args[1]))
+            break
+    if not stored:
+        return [{}]
+    names, values = stored
+    if isinstance(names, str):
+        names = [part.strip() for part in names.split(",")]
+    out = []
+    for value in values:
+        if not isinstance(value, tuple):
+            value = (value,)
+        out.append(dict(zip(names, value, strict=True)))
+    return out
+
+
+def _needs_pytest(fn) -> bool:
+    return any(name in _FIXTURES for name in inspect.signature(fn).parameters)
+
+
 def main_runner() -> int:
+    # Tests that need pytest fixtures are skipped. Parametrized cases are
+    # expanded, so the command exits 0 when the fixture-free tests pass.
+    # `python -m pytest` remains the full suite.
     tests = [
-        (n, f)
-        for n, f in sorted(globals().items())
-        if n.startswith("test_") and callable(f) and not n.startswith("test_json")
-        and not n.startswith("test_strict")
+        (name, fn)
+        for name, fn in sorted(globals().items())
+        if name.startswith("test_") and callable(fn)
     ]
     failed = 0
+    ran = 0
+    skipped = 0
     for name, fn in tests:
-        try:
-            fn()
-            print(f"  ok    {name}")
-        except AssertionError as err:
-            failed += 1
-            print(f"  FAIL  {name}: {err}")
-        except Exception as err:  # report the failure, do not abort the runner
-            failed += 1
-            print(f"  ERROR {name}: {type(err).__name__}: {err}")
-    print(f"\n{len(tests) - failed}/{len(tests)} passed")
+        if _needs_pytest(fn):
+            skipped += 1
+            print(f"  skip  {name} (needs pytest)")
+            continue
+        for kwargs in _cases(fn):
+            ran += 1
+            label = name if not kwargs else f"{name}[{next(iter(kwargs.values()))}]"
+            try:
+                fn(**kwargs)
+                print(f"  ok    {label}")
+            except AssertionError as err:
+                failed += 1
+                print(f"  FAIL  {label}: {err}")
+            except Exception as err:  # report the failure, do not abort the runner
+                failed += 1
+                print(f"  ERROR {label}: {type(err).__name__}: {err}")
+    print(f"\n{ran - failed}/{ran} passed, {skipped} skipped (need pytest)")
     return 1 if failed else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main_runner())
 
 
 # ---------------------------------------------------------------- 0.5.0 audit fixes
@@ -509,16 +564,48 @@ def test_schema_errors_are_not_duplicated_for_a_missing_citation():
     assert len([x for x in errors if "source_url" in x]) == 1, errors
 
 
-@pytest.mark.parametrize(
+@_parametrize(
     "pattern",
-    ["(?<!un)privileged", "(?=admin)owner", "(owner)\\1", "(?P<r>owner)(?P=r)", "a++"],
+    [
+        "(?<!un)privileged",
+        "(?=admin)owner",
+        "(owner)\\1",
+        "(?P<r>owner)(?P=r)",
+        "a++",
+        "a{1,2}+",
+        "(?#comment)admin",
+        "(a)?(?(1)admin|owner)",
+        r"foo\Z",
+        r"\0",
+        "(?a)admin",
+        r"(?<n>a)\k<n>",
+    ],
 )
 def test_a_pattern_viability_gate_cannot_compile_is_an_error(pattern):
     # REPRODUCED: a lookbehind passed here and was "invalid regex" in vg's G2.
+    # Also: `(?#...)`, `\Z`, `\0` and `(?a)` compile in Python and not in Rust;
+    # `++` compiles in both and means a different language in each.
     errors, _ = check(
         entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": pattern}])
     )
-    assert any("exclusions[0].pattern" in x for x in errors), errors
+    assert any("exclusions[0].pattern" in x for x in errors), (pattern, errors)
+
+
+@_parametrize(
+    "pattern",
+    ["[*+]", "[a*+?]", r"a}+", r"\*+", r"\\1", "(?P<name>owner|admin)", "(?i)admin"],
+)
+def test_a_pattern_both_engines_share_is_accepted(pattern):
+    # The old scanner treated any `*+` or `}+` as possessive, so a character
+    # class and a literal brace were rejected even though both engines accept
+    # them and agree on the language.
+    from validate import regex_problem
+
+    assert regex_problem(pattern) is None, (pattern, regex_problem(pattern))
+    errors, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": pattern}])
+    )
+    assert not any("pattern" in err for err in errors), (pattern, errors)
 
 
 def test_every_suggested_pattern_is_in_the_common_dialect():
@@ -530,12 +617,14 @@ def test_every_suggested_pattern_is_in_the_common_dialect():
             assert regex_problem(pattern) is None, (cid, regex_problem(pattern))
 
 
-@pytest.mark.parametrize(
+@_parametrize(
     "url",
     [
         "https://github.com/acme/todo-list-protocol/blob/main/BOUNTY.md",
         "https://docs.real-program.org/todo/rewards",
         "https://myexample.com/rewards",
+        "https://example.com.evil.example/rewards",
+        "https://not-example.org/rewards",
     ],
 )
 def test_a_real_url_containing_a_placeholder_word_is_not_a_placeholder(url):
@@ -544,7 +633,7 @@ def test_a_real_url_containing_a_placeholder_word_is_not_a_placeholder(url):
     assert not any("placeholder" in x for x in errors), errors
 
 
-@pytest.mark.parametrize(
+@_parametrize(
     "url",
     [
         "https://example.invalid/rewards",
@@ -552,6 +641,14 @@ def test_a_real_url_containing_a_placeholder_word_is_not_a_placeholder(url):
         "http://localhost:8000/rewards",
         "https://todo/rewards",
         "https://example.com/rewards",
+        "https://www.example.com/rewards",
+        "https://rewards.example.com/bounty",
+        "https://foo.example.org/rewards",
+        "https://example.net/rewards",
+        "http://127.0.0.1/rewards",
+        "http://[::1]/rewards",
+        "http://0.0.0.0/rewards",
+        "http://app.localhost/rewards",
     ],
 )
 def test_a_placeholder_host_is_caught_by_host(url):
@@ -560,9 +657,70 @@ def test_a_placeholder_host_is_caught_by_host(url):
 
 
 def test_a_future_retrieved_date_is_an_error():
-    future = (date.today().replace(year=date.today().year + 1)).isoformat()
+    # 15 January next year is always a real date, including in a leap year.
+    future = date(date.today().year + 1, 1, 15).isoformat()
     errors, _ = check(entry(retrieved=future))
     assert any("future" in x for x in errors), errors
+
+
+def test_retrieved_age_is_counted_in_utc(monkeypatch):
+    import validate as validate_mod
+
+    as_of = date(2026, 11, 9)
+    monkeypatch.setattr(validate_mod, "today", lambda: as_of)
+    errors, _ = check(entry(retrieved="2026-11-10"))
+    assert any("future" in err for err in errors), errors
+    stale = as_of.fromordinal(as_of.toordinal() - (validate_mod.STALE_DAYS + 1))
+    _, warnings = check(entry(retrieved=stale.isoformat()))
+    assert any(f"{validate_mod.STALE_DAYS + 1} days" in w for w in warnings), warnings
+    fresh = as_of.fromordinal(as_of.toordinal() - validate_mod.STALE_DAYS)
+    _, warnings = check(entry(retrieved=fresh.isoformat()))
+    assert not any("days ago" in w for w in warnings), warnings
+
+
+def test_a_second_yaml_document_is_not_silently_dropped(capsys, tmp_path):
+    bad = tmp_path / "ledger.yaml"
+    bad.write_text(
+        "- id: one\n"
+        "  tier_shape: unknown\n"
+        "  floor_status: unstated\n"
+        "  source_url: https://docs.real-program.org/one\n"
+        '  retrieved: "2026-10-01"\n'
+        "---\n"
+        "- id: two\n"
+        "  tier_shape: unknown\n"
+        "  floor_status: unstated\n"
+        "  source_url: https://docs.real-program.org/two\n"
+        '  retrieved: "2026-10-01"\n',
+        encoding="utf-8",
+    )
+    code = main(["--format", "json", str(bad)])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 2, payload
+    assert "single YAML document" in payload["error"]
+
+
+def test_a_blank_or_padded_pattern_is_an_error():
+    empty, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": "   "}])
+    )
+    assert any("empty" in err for err in empty), empty
+    padded, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": " admin "}])
+    )
+    assert any("whitespace" in err for err in padded), padded
+
+
+def test_padded_citation_fields_are_checked_without_the_space():
+    errors, warnings = check(
+        entry(
+            source_url="  https://docs.real-program.org/rewards  ",
+            retrieved="  2026-10-01  ",
+        )
+    )
+    assert errors == [], errors
+    assert any("source_url has surrounding whitespace" in w for w in warnings), warnings
+    assert any("retrieved has surrounding whitespace" in w for w in warnings), warnings
 
 
 def test_a_conflicting_floor_beside_a_settled_shape_is_an_error():
@@ -578,6 +736,25 @@ def test_the_any_migration_message_distinguishes_explicit_from_absent():
     assert "low_and_above" in joined and "unstated" in joined, joined
 
 
+def test_a_non_string_id_is_reported_instead_of_crashing(capsys, tmp_path):
+    # A YAML list (or mapping) is unhashable. The duplicate-id set used to
+    # raise TypeError before the schema error could be reported.
+    bad = tmp_path / "ledger.yaml"
+    bad.write_text(
+        "- id: [not, a, slug]\n"
+        "  tier_shape: unknown\n"
+        "  floor_status: unstated\n"
+        "  source_url: https://docs.real-program.org/rewards\n"
+        '  retrieved: "2026-10-01"\n',
+        encoding="utf-8",
+    )
+    code = main(["--format", "json", str(bad)])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 1, payload
+    assert payload["ok"] is False
+    assert any("id" in err for err in payload["errors"]), payload["errors"]
+
+
 def test_the_schema_and_the_readme_agree_on_an_explicit_none_floor():
     # REPRODUCED: the README said "SEVERITY FLOOR: NONE" is documented +
     # low_and_above while the schema said it is unknown + unstated.
@@ -586,3 +763,7 @@ def test_the_schema_and_the_readme_agree_on_an_explicit_none_floor():
     assert "EXPLICITLY states 'SEVERITY FLOOR: NONE' or 'any' is 'low_and_above'" in shape_doc
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "| `SEVERITY FLOOR: NONE` or `SEVERITY FLOOR: any`, in those words | `documented` | `low_and_above` |" in readme
+
+
+if __name__ == "__main__":
+    raise SystemExit(main_runner())

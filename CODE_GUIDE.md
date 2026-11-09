@@ -5,11 +5,10 @@ tools; this document explains what every file, field, function, check and test a
 file-and-line references into the tree it describes. Read the README first; read this when you want
 to change something.
 
-**Accuracy pin.** Written against tag `v0.5.0` (release [v0.5.0], 2026-11-06), which is commit
-`8489e62` on `main` — the repository state where `python -m pytest tests/ -q -rs` collects 132
-tests and `python scripts/validate.py --taxonomy` prints 5 tier shapes and 14 clause classes. Line
-numbers refer to that state and drift as the files change; the identifiers they point at are stable
-in practice. Every count in this document was derived from the files themselves (see
+**Accuracy pin.** Written against version 0.6.0 (2026-11-09). `python -m pytest tests/ -q -rs`
+collects 169 tests and `python scripts/validate.py --taxonomy` prints 5 tier shapes and 14 clause
+classes. Line numbers refer to that tree and drift as the files change; the identifiers they point
+at are stable in practice. Every count in this document was derived from the files themselves (see
 [How this document is verified](#how-this-document-is-verified)).
 
 **What this is not.** Not an API reference in the documentation-generator sense: the package ships
@@ -29,11 +28,11 @@ Eight directories and the repository root, each with one job:
 | `schemas/` | One file, [ledger.schema.json](schemas/ledger.schema.json): JSON Schema (draft 2020-12) for the private ledger format, version v1. Enforced by the validator since 0.5.0. |
 | `scripts/` | Eight Python modules: the validator ([validate.py](scripts/validate.py)), the gate-token resolver ([crossref.py](scripts/crossref.py)), the identity-token vocabulary ([token_scan.py](scripts/token_scan.py)), and the four repository guards ([check_generic.py](scripts/check_generic.py), [check_hygiene.py](scripts/check_hygiene.py), [check_links.py](scripts/check_links.py), [check_markdown.py](scripts/check_markdown.py)). [`__init__.py`](scripts/__init__.py) makes the directory importable as the installable package `bounty_economics`. |
 | `examples/` | Two fictional ledgers: [ledger.example.yaml](examples/ledger.example.yaml) (1 full entry) and [tier-shapes.example.yaml](examples/tier-shapes.example.yaml) (5 entries, one per tier shape). Every URL uses the reserved `.invalid` TLD. |
-| `tests/` | Six pytest suites, 132 collected tests: [test_validate.py](tests/test_validate.py) (validator behaviour), [test_counts.py](tests/test_counts.py) (count/vocabulary drift), [test_compat_viability_gate.py](tests/test_compat_viability_gate.py) (the cross-repo contract), [test_crossref.py](tests/test_crossref.py), [test_generic.py](tests/test_generic.py), [test_token_scan.py](tests/test_token_scan.py). |
+| `tests/` | Six pytest suites, 169 collected tests: [test_validate.py](tests/test_validate.py) (validator behaviour), [test_counts.py](tests/test_counts.py) (count/vocabulary drift), [test_compat_viability_gate.py](tests/test_compat_viability_gate.py) (the cross-repo contract), [test_crossref.py](tests/test_crossref.py), [test_generic.py](tests/test_generic.py), [test_token_scan.py](tests/test_token_scan.py). |
 | `.github/workflows/` | [ci.yml](.github/workflows/ci.yml): the two CI jobs, `validate` and `compat`. |
 | `.github/ISSUE_TEMPLATE/` | [correction.md](.github/ISSUE_TEMPLATE/correction.md) and [takedown-request.md](.github/ISSUE_TEMPLATE/takedown-request.md): structured intake for "a claim is wrong" and "this text identifies a target". |
 | `.github/` | [dependabot.yml](.github/dependabot.yml): weekly, grouped bump PRs for the pinned Python tools (pip) and the GitHub Actions versions (github-actions). |
-| Root | [README.md](README.md) (the method, the schema docs, the cross-repo matrix), [CHANGELOG.md](CHANGELOG.md) (Keep-a-Changelog, versions track the ledger schema), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CITATION.cff](CITATION.cff) (version 0.5.0, released 2026-11-06), [LICENSE](LICENSE) (MIT), `pyproject.toml`, `requirements-ci.txt`, `.gitattributes`, `.gitignore`. |
+| Root | [README.md](README.md) (the method, the schema docs, the cross-repo matrix), [CHANGELOG.md](CHANGELOG.md) (Keep-a-Changelog, versions track the ledger schema), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CITATION.cff](CITATION.cff) (version 0.6.0, released 2026-11-09), [LICENSE](LICENSE) (MIT), `pyproject.toml`, `requirements-ci.txt`, `.gitattributes`, `.gitignore`. |
 
 Two conventions shape the whole tree:
 
@@ -225,10 +224,13 @@ re-derivation against any dataset" (17-19). Two mappings:
   `G4_prior_audit` → `prior-audit-surface`, which the README documents in prose — "there is no
   catalog file for it yet, because an audit list, unlike a tier or a clause, cannot be published
   generically without naming the program" (48-52).
-- `not_program_terms` (57-67): ten gates whose signal lives elsewhere, each with a note saying
+- `not_program_terms` (57-71): eleven gates whose signal lives elsewhere, each with a note saying
   where: `D1_duplicate_check`, `G3_scope_tree`, `G5_test_intent`, `P7_best_practice`,
   `P12_no_persisted_impact`, `P17_no_attacker_win`, `P18_design_tradeoff`,
-  `P19_headline_mismatch`, `P20_cooperating_party`, `REALISM`.
+  `P19_headline_mismatch`, `P20_cooperating_party`, `design_review`, `REALISM`.
+  `design_review` was missing from both halves until 0.6.0, so the helper called a real shared
+  token unknown. It is a no-impact review of the finding; the program-terms side of a design
+  exclusion is the `design_issue` class, reached through `G2_exclusion_clause`.
 
 [tests/test_crossref.py](tests/test_crossref.py) pins the file: every token must be inside the
 hardcoded shared vocabulary `VALID_GATES` (27-44, 16 tokens, "Hardcoded on purpose"), no gate in
@@ -241,12 +243,13 @@ The **cross-reference fields to the rejection-taxonomy vocabularies** are exactl
 tokens: the gate vocabulary itself is authored in `rejection-taxonomy/data/SCHEMA.md`; this repo
 consumes it via `VALID_GATES` and `data/gate-crossref.yaml` and contributes no tokens of its
 own. The README's rejection statistics (38% duplicates, 43/113; 23% out of scope, 26/113,
-README.md:187-191) are quoted from the published rejection-taxonomy dataset at v0.5.1 and labelled
-as one researcher's log, "not an industry census".
+README.md) are quoted from the published rejection-taxonomy dataset at v0.6.0 (38.1% duplicates,
+43/113; 23.0% out of scope, 26/113) and labelled as one researcher's log, "not an industry census".
+v0.6.0 of that dataset did not change the triage counts.
 
 ## scripts/ — the validator, the resolver, the guards
 
-### scripts/validate.py (614 lines)
+### scripts/validate.py (768 lines)
 
 The ledger validator and the tool that prints the taxonomies. Module docstring documents usage and
 exit codes: 0 valid, 1 validation errors, 2 usage/parse error (20-23). PyYAML and jsonschema are
@@ -258,22 +261,32 @@ the data ships inside `bounty_economics`). `ROOT`, `TIER_FILE`, `CLAUSE_FILE`,
 `SCHEMA_FILE` are module constants (63-66); `SCHEMA_VERSION = 1` (71) is the ledger format
 version this validator implements. Vocabulary constants: `FLOOR_SEVERITIES` (73),
 `FLOOR_STATUSES` (82), `SLUG_RE` (84), `DATE_RE` (85), placeholder-host lists
-`PLACEHOLDER_HOSTS`/`PLACEHOLDER_SUFFIXES`/`PLACEHOLDER_LABELS` (90-92), `STALE_DAYS = 180`
-(94), `UNSUPPORTED_REGEX` (99-105, five probe pairs: lookaround, numbered and named
-backreference, atomic group, possessive quantifier), and `_SCHEMA_COVERED` (110,
-`{"required", "enum", "const", "pattern", "minLength"}` — schema findings the semantic layer
-re-reports with better messages, so they are suppressed in `schema_errors`).
+`RESERVED_EXAMPLE_DOMAINS` / `PLACEHOLDER_HOSTS` / `PLACEHOLDER_SUFFIXES` / `PLACEHOLDER_LABELS`,
+`STALE_DAYS = 180`, `today()` (UTC, the same clock viability-gate uses), and `_SCHEMA_COVERED`
+(`{"required", "enum", "const", "pattern", "minLength"}` — schema findings the semantic layer
+re-reports with better messages, so they are suppressed in `schema_errors`). The regex dialect
+is a scan (`_dialect_problem`), not five probes over the pattern text: a probe for `*+` also
+matched inside a character class.
 
 **Functions, in call order:**
 
-- `placeholder_host(url: str) -> str | None` (113-122) — the placeholder host in a URL, or None.
-  Matches the URL's HOST (via `urlparse`), never a substring: exact hosts `example.com`,
-  `www.example.com`, `localhost`, `127.0.0.1`; suffixes `.invalid`, `.localhost`; or a
-  `todo`/`tbd`/`changeme` host label. This is the 0.5.0 fix for "a real repository called
-  todo-list is not a placeholder" (CHANGELOG.md:66-68).
-- `regex_problem(pattern: str) -> str | None` (125-137) — why a pattern is unusable by BOTH
-  tools: an `UNSUPPORTED_REGEX` hit (message names viability-gate's Rust regex) or a Python
-  compile failure under `re.IGNORECASE`.
+- `placeholder_host(url: str) -> str | None` — the placeholder host in a URL, or None.
+  Matches the URL's HOST (via `urlparse`), never a substring. Reserved documentation domains
+  `example.com`, `example.org` and `example.net`, including every subdomain; exact hosts
+  `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`; suffixes `.invalid` and `.localhost`; or a
+  `todo`/`tbd`/`changeme` host label. `myexample.com` is a different name and is not flagged.
+  Host matching (rather than a substring of the whole URL) is the 0.5.0 fix for "a real
+  repository called todo-list is not a placeholder"; subdomains of the reserved example domains
+  are the 0.6.0 fix.
+- `regex_problem(pattern: str) -> str | None` — why a pattern is unusable by BOTH tools. The
+  scan rejects lookaround, atomic groups, comment groups, conditionals, backreferences
+  (including `\0` and `\g`), Python-only flags `(?a)` / `(?L)`, the `\Z` end marker, and
+  possessive quantifiers (`++`, `*+`, `?+`, `{n}+`). Possessive `++` compiles in Rust regex
+  1.13 as a nested quantifier, so both engines accept the text and disagree on the language.
+  A character class such as `[*+]` and a literal brace `a}+` are not possessive and are
+  accepted. Anything else must compile under `re.IGNORECASE`. A blank pattern, or one with
+  surrounding whitespace, is an error in `validate_entry`: viability-gate trims before
+  compiling and treats a blank pattern as untested.
 - `load_taxonomies() -> tuple[dict[str, dict], dict[str, dict]]` (140-152) — parses both data
   files and returns id-keyed maps; exit 2 if either file is missing. This is the function the
   other scripts and the tests import.
@@ -282,54 +295,30 @@ re-reports with better messages, so they are suppressed in `schema_errors`).
   attached. Cached in `_ENTRY_VALIDATOR` (155).
 - `schema_errors(entry: dict, where: str) -> list[str]` (170-177) — sorted schema findings: iterates `entry_validator().iter_errors`, skips validators in `_SCHEMA_COVERED`,
   formats each as `{where}: schema: {path}: {message}`.
-- `validate_entry(entry, index, tier_map, clause_map, example_mode=False) -> tuple[list[str], list[str]]`
-  (180-444) — the semantic pass over one entry; returns (errors, warnings). Checks, in order:
-  1. mapping-ness (197-198); `id` present and slug-shaped (200-206);
-  2. JSON Schema enforcement on a copy with a YAML date object normalized to its ISO text, so the
-     one mistake is not reported twice (208-216);
-  3. `schema_version` pin (219-225) — any implemented-but-different version is an error naming
-     CHANGELOG.md;
-  4. `tier_shape` (228-256): missing → error; the removed `any` → the migration error (235-241),
-     which distinguishes an explicit NONE floor (`low_and_above` + `documented`) from an absent
-     one (`unknown` + `unstated`); unknown-to-the-taxonomy → error (242-243); else warn when
-     the shape is `unknown` (246-250, "NOT permissive") or pays two or fewer severities (251-256,
-     "Confirm your thesis can reach it before hunting");
-  5. `floor_severity` (259-280): `informational` → error with the two correct spellings
-     (261-267); outside the enum → error (268-270); against the shape: mismatch → warning (274-278),
-     set shape with empty floor → warning (279-280);
-  6. `floor_status` (282-343): missing → warning naming viability-gate's G1 (289-295); outside
-     enum → error (296-299); `documented` with empty severity → error (300-305) and beside
-     `unknown` → error (306-311); `unstated` with a severity → error (312-318), beside a shape
-     other than `unknown` → error (319-325), else warning "the floor is not evidence-backed"
-     (326-331); `conflicting` beside a settled shape → error (332-338) plus the record-both
-     warning (339-343);
-  7. citation (345-366): missing `source_url` → error "An uncited entry is a guess" (347-351);
-     non-http(s) → error (352-354); placeholder host → error, or warning in `example_mode`
-     (355-366);
-  8. `retrieved` (368-398): missing → error; non-string (the unquoted-YAML-date case) → warning
-     with the type name (373-380); not YYYY-MM-DD → error (381-382); not a real calendar date →
-     error (384-387); in the future → error (389-393); older than `STALE_DAYS` (180) → warning
-     (394-397);
-  9. `exclusions` (400-420): must be a list; each item a mapping with `class` in the taxonomy
-     (409-413), a non-empty verbatim `clause` (414-415), and — if `pattern` is present — no
-     `regex_problem` (416-420);
-  10. `prior_audits` (422-442): must be a list; each item a mapping with `firm` (error if
-      missing), and warnings for a missing `url` (433-437) or a missing `covers` list (438-442).
-- `print_taxonomy(tier_map, clause_map) -> None` (447-454) — the text rendering CI smoke-tests.
-- `taxonomy_payload(tier_map, clause_map) -> dict` (457-471) — the machine-readable form:
-  `schema_version`, then `tier_shapes` and `clause_classes`, each with `source`, `count`
-  and full `items`.
-- `main(argv: list[str] | None = None) -> int` (474-610) — argparse: zero or more ledger paths
-  (`nargs="*"`, "a shell glob such as examples/*.yaml works", 476-481), `--strict` (482),
-  `--example-mode` (483-490), `--taxonomy` (491), `--format {text,json}` (492-497).
-  Behaviour: `--taxonomy` prints and returns 0 (511-516); a missing ledger path → exit 2 (523-525);
-  each file is read as YAML with encoding `utf-8-sig` (532), must be a list (536-539);
-  `example_mode` is explicit OR the filename ends `.example.yaml` (529); duplicate ids across a
-  file are errors (543-554); with several ledgers, per-file summaries are printed and every
-  message is prefixed with its path (566-573); JSON output carries `schema_version`, `ok`,
-  `strict`, `ledgers` (per-file results), `entries`, `errors`, `warnings`, plus a single
-  `ledger` key only when exactly one file was given (577-589); the exit is 1 when any error
-  exists or when `--strict` promotes warnings (575, 610).
+- `validate_entry(...)` (288) — the semantic pass over one entry; returns (errors, warnings).
+  Checks, in order: mapping-ness and a slug-shaped `id` (310); JSON Schema on a copy whose YAML
+  date is normalized to ISO text and whose citation strings are stripped, so one mistake is not
+  reported twice; `schema_version` (331) — a version this validator does not implement is an
+  error naming CHANGELOG.md; `tier_shape`, including the removed `any` migration (348), which
+  distinguishes an explicit NONE floor from an absent one; a warning when the shape is
+  `unknown` ("NOT permissive") or pays two or fewer severities; `floor_severity`, including the
+  rejection of `informational` (374) and a warning when it disagrees with the shape (G1 uses
+  the stricter of the two); `floor_status` (404), with the unstated/documented/conflicting
+  contradictions as errors; citation (468), placeholder host as an error or, in example mode, a
+  warning; `retrieved` (495), age counted by `today()` in UTC, future as an error, older than
+  180 days as a warning; exclusions (528), including an empty or padded `pattern`; prior audits
+  (568), warning when `url` or `covers` is missing.
+- `print_taxonomy` (590) — the text rendering CI smoke-tests.
+- `taxonomy_payload` (600) — the machine-readable form: `schema_version`, then `tier_shapes`
+  and `clause_classes`, each with `source`, `count` and full `items`.
+- `main` (617) — argparse: zero or more ledger paths, `--strict`, `--example-mode`,
+  `--taxonomy`, `--format {text,json}`. `--taxonomy` prints and returns 0. Each file is read
+  as a single YAML document (`utf-8-sig`, 675); a second document is exit 2. The value must be
+  a list. `example_mode` is explicit or the filename ends `.example.yaml`. Duplicate ids are
+  tracked only when `id` is a string, so a list or mapping is a schema error rather than a
+  crash. JSON output carries `schema_version`, `ok`, `strict`, `ledgers`, `entries`, `errors`,
+  `warnings`, plus a single `ledger` key only when exactly one file was given (733). Exit 1
+  when any error exists or when `--strict` promotes warnings.
 
   **Error-report behaviour.** Text mode: warnings to stdout prefixed `WARN `, errors to stderr
   prefixed `ERROR `, then a blank line and a per-file and total count line (591-608). JSON mode:
@@ -337,18 +326,20 @@ re-reports with better messages, so they are suppressed in `schema_errors`).
   and return the code. The JSON verdict is produced by the same pass as the text verdict — pinned
   by `test_json_format_is_the_same_verdict_as_text` (tests/test_validate.py:392-398).
 
-### scripts/crossref.py (115 lines)
+### scripts/crossref.py (165 lines)
 
-Resolves a gate token to this repo's catalogs. `CATALOGS` (41-45) maps the three catalog names —
+Resolves a gate token to this repo's catalogs. `CATALOGS` (49) maps the three catalog names —
 `tier-shapes`, `clause-classes`, `prior-audit-surface` (the last "(prose only — see the
-README)"). `load_crossref() -> dict` (48-52) parses the data file (exit 2 if missing);
-`catalog_entries(catalog: str) -> list[str]` (55-62) returns the ids a catalog publishes, via
-`load_taxonomies` — empty for the prose catalog. `print_gate(gate: str, cross: dict) -> int`
-(65-84) prints the mapping and its `read` note, the entries for data-backed catalogs, or — for a
-gate in `not_program_terms` — "not answered by this repo's catalogs" plus where the signal lives;
-an unknown token prints the sorted known-gate list to stderr and exits 1 (81-84).
-`print_all(cross: dict) -> int` (87-96) renders both halves. `main` (99-111) takes an optional
-gate token and `--format {text,json}`; JSON dumps the whole crossref mapping. Verified output:
+README)"). `load_crossref()` (56) parses the data file (exit 2 if missing);
+`catalog_entries()` (63) returns the ids a catalog publishes, via `load_taxonomies` — empty for
+the prose catalog. `print_gate()` (97) prints the mapping and its `read` note, the entries for
+data-backed catalogs, or — for a gate in `not_program_terms` — "not answered by this repo's
+catalogs" plus where the signal lives; an unknown token prints the sorted known-gate list to
+stderr and exits 1. `gate_record()` (73) is the same resolution as a dict.
+`print_all(cross: dict) -> int` renders both halves. `gate_record` is the one-gate JSON object.
+`main` takes an optional gate token and `--format {text,json}`. JSON with no gate dumps the whole
+mapping; JSON with a gate dumps that record, and an unknown token exits 1. The data path is
+`validate.ROOT`, so a wheel import finds `gate-crossref.yaml` inside the package. Verified output:
 `python scripts/crossref.py G2_exclusion_clause` prints the clause-classes catalog with its 14
 entries; `G1_severity_floor` the 5 tier-shape ids; `NOT_A_GATE` exits 1.
 
@@ -376,17 +367,18 @@ Four scripts CI runs as steps; each is also importable so the tests run the same
   `github.com/<org>/<repo>` URL whose slug does not start with the project's own `khomdev/`
   namespace (39-44, 58-61) — so the schema's own `$id` is allowed. Default targets are
   `data/*.yaml` and `schemas/*.json` (46); exit 0 clean / 1 problems / 2 usage (18-21).
-- **[check_hygiene.py](scripts/check_hygiene.py) (247 lines)** — the whole repository, including
+- **[check_hygiene.py](scripts/check_hygiene.py) (260 lines)** — the whole repository, including
   prose and scripts. `iter_files()` (74-101) lists exactly what git would commit (tracked plus
   untracked-not-ignored; falls back to a directory walk skipping `SKIP_DIRS`, 36-46). Three
   working-tree checks plus one history check:
-  - `check_encoding` (108-119): eight mojibake byte sequences (48-57) — the UTF-8-as-cp1252
-    signatures.
+  - `check_encoding`: reads bytes. A leading UTF-8 BOM and a file that is not valid UTF-8 are
+    errors (a non-UTF-8 file used to be skipped). Eight mojibake sequences — the UTF-8-as-cp1252
+    signatures — are still checked in the decoded text.
   - `check_tripwires` (122-137): every `TOKENS` hit outside the one allowlisted file.
   - `check_private` (140-154): six private-path prefixes (59-62).
   - `check_history` (157-193): re-scans every blob in every commit — "a token deleted in a later
     commit is still in the history forever" — using the same allowlist. Running it today reports
-    24 hits: the platform product name removed in 0.5.0, still present in tags up to and including
+    20 hits: the platform product name removed in 0.5.0, still present in tags up to and including
     `v0.4.1` (the 0.5.0 changelog records that "Earlier tags still contain the old text; git
     history is not rewritten here", CHANGELOG.md:43). This is why CI runs the script with
     `--no-history` (.github/workflows/ci.yml:68-73): published history is an owner decision, not
@@ -430,13 +422,12 @@ filename (scripts/validate.py:529), so the placeholder-host check warns instead 
 
 ## tests/
 
-Six suites, 132 collected tests. Collected counts by file: test_validate.py 70, test_counts.py
-25, test_compat_viability_gate.py 13, test_generic.py 10, test_crossref.py 7, test_token_scan.py
-7 — with test_validate.py contributing 70 collected cases from 60 functions plus 10 extra
-parametrized fixtures (5 regex constructs, 3 real-URL and 5 placeholder-host cases over three
-functions).
+Six suites, 169 collected tests. Collected counts by file: test_validate.py 99, test_counts.py
+27, test_compat_viability_gate.py 13, test_generic.py 10, test_crossref.py 11, test_token_scan.py
+9. test_validate.py collects 99 cases from 66 functions; the extra cases are the parametrized
+regex, real-URL and placeholder-host rows.
 
-- **[test_validate.py](tests/test_validate.py) (588 lines, 60 test functions; 70 collected)**
+- **[test_validate.py](tests/test_validate.py) (769 lines, 66 test functions; 99 collected)**
   pins validator behaviour, grouped by section headers: taxonomies (59-104 — five shapes, no
   `any`, `low_and_above` is the widest, no informational floor, fourteen classes, every class
   has `kills` and an `escape` key); citation (110-153 — missing `source_url`/`retrieved`
@@ -452,7 +443,7 @@ functions).
   no double report for a missing citation, five unsupported-regex constructs, real URLs containing
   placeholder words, placeholder hosts caught by host, future dates, a conflicting floor beside a
   settled shape, the any-migration wording, and README/schema agreement on an explicit NONE floor.
-- **[test_counts.py](tests/test_counts.py) (235 lines, 25 functions)** — the drift alarm. Exists
+- **[test_counts.py](tests/test_counts.py) (255 lines, 27 functions)** — the drift alarm. Exists
   because "the README advertised 'six fictional entries, one per tier shape' for a file that has
   five" (docstring 4-7). Sections: the worked example (51-90), the README (96-150 — quotes real
   counts, no retracted claims; `RETRACTED_CLAIMS` at 121-127 is a five-entry tuple of exact
@@ -470,7 +461,7 @@ functions).
   builds it with `cargo build --locked`. Locally the cross-repo half SKIPS with the reason
   printed by `-rs` (CI sets `BE_COMPAT_REQUIRED=1` and runs it for real,
   .github/workflows/ci.yml:111-143); the in-repo half (178-203) always runs.
-- **[test_crossref.py](tests/test_crossref.py) (109 lines, 7 functions)** — the gate
+- **[test_crossref.py](tests/test_crossref.py) (160 lines, 11 functions)** — the gate
   cross-reference stays inside the shared vocabulary and composes with the catalogs (the
   [data/gate-crossref.yaml](data/gate-crossref.yaml) section above describes every assertion).
 - **[test_generic.py](tests/test_generic.py) (67 lines, 10 functions)** — the genericity check:
@@ -478,7 +469,7 @@ functions).
   case-insensitively), foreign GitHub and gitlab links caught, our own repo links allowed, and
   the command's exit codes (1 for a bad file, 2 for usage errors, 2 when there is nothing to
   scan).
-- **[test_token_scan.py](tests/test_token_scan.py) (93 lines, 7 functions)** — the matcher
+- **[test_token_scan.py](tests/test_token_scan.py) (111 lines, 9 functions)** — the matcher
   fixtures: 15 English words containing a token pass (`CONTAINS_A_TOKEN`, 29-45); every declared
   token fails when standing alone, read from the vocabulary so the fixtures cannot drift from the
   list (55-60); the boundary is a word boundary, not a substring (63-66); the allowlist is exactly
@@ -488,7 +479,7 @@ functions).
 
 ## CI, release and versioning
 
-**[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** (143 lines) — two jobs, `on:`
+**[`.github/workflows/ci.yml`](.github/workflows/ci.yml)** (153 lines) — two jobs, `on:`
 push to main and all pull requests, `permissions: contents: read`:
 
 - **`validate`** (12-109): a `fail-fast: false` matrix over Python 3.10/3.11/3.12/3.13 on
@@ -510,7 +501,7 @@ push to main and all pull requests, `permissions: contents: read`:
   `--filter=blob:none` (carrying every tag, so the pin stays in exactly one place) into the
   workspace's parent directory, and runs `pytest tests/test_compat_viability_gate.py -q -rs`.
 
-**Packaging** (pyproject.toml): `bounty-economics` 0.5.0, `requires-python >= 3.10`, runtime
+**Packaging** (pyproject.toml): `bounty-economics` 0.6.0, `requires-python >= 3.10`, runtime
 deps `pyyaml>=6` and `jsonschema>=4.18`; `dev` extras pytest and ruff. The packaging trick
 is at 43-53: `scripts/` is mapped to the package `bounty_economics` (`[tool.setuptools.package-dir]`),
 with `data/` and `schemas/` re-mounted inside it as package data — that is why
@@ -525,9 +516,11 @@ anything.
 ledger schema"; "Nothing here has been published to a package index. Publishing is a human
 decision, not a build step." History note at 9-14: repository history was reset on 2026-10-10 to
 remove identifying material from earlier commits. Tag history on main: 0.2.0 (2026-10-14), 0.3.0
-(2026-10-21), 0.4.0 (2026-10-28), 0.4.1 (2026-11-05), 0.5.0 (2026-11-06); each release's notes
-record what changed and, for the taxonomy-review releases (0.3.0, 0.4.0), the explicit "no new
-class" conclusion. `CITATION.cff` carries the same version (0.5.0) and release date. A README
+(2026-10-21), 0.4.0 (2026-10-28), 0.4.1 (2026-11-05), 0.5.0 (2026-11-06), 0.6.0 (2026-11-09);
+each release's notes record what changed and, for the taxonomy-review releases (0.3.0, 0.4.0),
+the explicit "no new class" conclusion. `CITATION.cff` carries the same version (0.6.0) and
+release date. `scripts/check_markdown.py` fails if that version, the latest CHANGELOG heading
+and `pyproject.toml` disagree. A README
 link pinning a tag must name the current version or `check_markdown.py` fails
 (scripts/check_markdown.py:69-77).
 
@@ -555,7 +548,7 @@ by design — removing them is a history rewrite, which CHANGELOG.md:43 explicit
 
 ## How this document is verified
 
-Every factual claim above was checked against the tree at tag `v0.5.0` (commit `8489e62`):
+Every factual claim above was checked against the 0.6.0 tree:
 
 - Path:line references were written from a full read of every file they cite.
 - Counts were derived by loading the files: 5 tier shapes and 14 clause classes
@@ -563,7 +556,7 @@ Every factual claim above was checked against the tree at tag `v0.5.0` (commit `
   prior-audit properties (schemas/ledger.schema.json), 35 identity tokens and 15 platform tokens
   (scripts/token_scan.py), 5 answered and 10 not-answered gates (data/gate-crossref.yaml),
   1 + 5 example entries, and the per-suite collected counts (pytest --collect-only per file;
-  132 in total).
+  169 in total).
 - Behaviour claims were exercised: `python scripts/validate.py` on the examples (6 entries, 0
   errors, 10 warnings), `--taxonomy` text and JSON, `crossref.py` for answered, not-answered
   and unknown tokens, the placeholder-host negative case, a clean-venv wheel install run from

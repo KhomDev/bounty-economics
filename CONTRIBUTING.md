@@ -34,7 +34,8 @@ python scripts/validate.py --taxonomy
 ```
 
 All five must pass before a pull request. CI runs them on Python 3.10 through 3.13, plus the
-genericity check and the placeholder-host negative test.
+genericity, link, markdown and hygiene checks, the placeholder-host negative test, a clean wheel
+install and the cross-repo compatibility job.
 
 ## Changing a taxonomy
 

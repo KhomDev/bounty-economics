@@ -64,4 +64,8 @@ not_program_terms:
   P18_design_tradeoff: a documented design decision; overlaps G4 but is read from the finding
   P19_headline_mismatch: a property of the report (headline vs PoC), not the program
   P20_cooperating_party: a property of the finding (a second party must act), not the program
+  design_review: >-
+    a no-impact or intentional-design review of the finding, not the program's
+    terms. The program-terms side of a design exclusion is the design_issue
+    class, reached through G2_exclusion_clause.
   REALISM: attacker-model / configuration realism, read from the finding

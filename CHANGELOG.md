@@ -28,6 +28,79 @@ The tree itself is unchanged except for the tripwire fix recorded here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-09
+
+A review release. The ledger schema is still v1. A ledger that already
+validated keeps validating, except where a check below got stricter: a
+documentation host that is not the apex of `example.com`, a pattern only one
+of the two engines accepts, a blank or padded exclusion pattern, a second
+YAML document, or a `retrieved` date that is today on a local clock and
+tomorrow in UTC.
+
+### Fixed
+
+- **A non-string `id` crashed the validator.** A YAML list or mapping in `id`
+  is unhashable. The duplicate-id check put it in a set and raised TypeError,
+  so the schema error was never reported.
+- **Reserved documentation hosts were only partly recognised.** `example.com`
+  and `www.example.com` were placeholders; `rewards.example.com` was accepted
+  as a real citation. `example.com`, `example.org` and `example.net`, and every
+  subdomain of them, are placeholders, as are `::1`, `0.0.0.0` and any
+  `*.localhost` host. `myexample.com` is a different name and is not flagged.
+  The README lists the same set the code checks, including `127.0.0.1`, which
+  was checked and not documented.
+- **The regex dialect check both rejected patterns both engines accept and
+  accepted patterns only Python accepts.** A character class `[*+]` and a
+  literal `a}+` were reported as possessive quantifiers. Comment groups
+  `(?#...)`, conditionals, `\Z`, `\0` and the `(?a)` flag compile in Python
+  and not in Rust's regex 1.13, the crate viability-gate v0.5.0 pins. `++` is
+  still rejected: Python treats it as possessive and Rust as a nested
+  quantifier, so the tools would not match the same text.
+- **A second YAML document was silently dropped.** `safe_load` kept the first
+  document. A file with two `---` blocks is now an error.
+- **`retrieved` ages used the local calendar.** viability-gate counts days in
+  UTC. The validator does too.
+- **A blank exclusion pattern, or one with surrounding whitespace, was
+  accepted.** viability-gate trims the pattern and treats a blank one as
+  untested, so the two tools were not testing the same expression. A citation
+  field with surrounding whitespace is warned about and checked without it.
+- **`design_review` was an unknown gate.** It is in the shared vocabulary and
+  was in neither half of `data/gate-crossref.yaml`. It is recorded as not
+  answered here: it is a no-impact review of the finding. The program-terms
+  side of a design exclusion remains the `design_issue` class, through
+  `G2_exclusion_clause`.
+- **`crossref.py GATE --format json` ignored the gate and exited 0 for a
+  typo.** A named gate is now that one record. An unknown token is a JSON
+  error and exit 1. The data file is resolved the same way the installed
+  validator resolves its taxonomies, so the module works from a wheel.
+- **The encoding check skipped files that were not UTF-8**, which is the
+  cp1252 case it describes, and it did not see a UTF-8 BOM. Both are reported.
+- **`python tests/test_validate.py` did not run the suite the README offers.**
+  It exited in the middle of the file, before the tests below that point were
+  defined, and it called parametrized tests with no arguments. Fixture tests
+  are skipped, parametrized cases run, and pytest is optional for that
+  command. The full suite is still pytest.
+
+### Documentation
+
+- "one of a dozen things" is the fourteen clause classes. The test section
+  lists six suites, not four. The license table includes `CODE_GUIDE.md` and
+  all three files under `data/`.
+- Rejection figures cite rejection-taxonomy v0.6.0. The triage counts are
+  unchanged: 38.1% duplicates (43/113) and 23.0% out of scope (26/113). The
+  v0.5.1 tag those figures were previously cited against no longer exists.
+- A floor-conflict warning names both readings and says viability-gate's G1
+  uses the stricter of the two.
+- Dependabot's comment listed only PyYAML. jsonschema is a runtime dependency
+  too.
+- `CODE_GUIDE.md` said the history scan reports 24 hits. It reports 20, all of
+  them the product name removed in 0.5.0, in tags up to and including v0.4.1.
+
+### Changed
+
+- Package version 0.5.0 → 0.6.0. The ledger schema stays v1. The viability-gate
+  pin stays `v0.5.0`; that is still the current release of the sibling.
+
 ## [0.5.0] — 2026-11-06
 
 The audit release. A 2026-11-06 audit reproduced each defect below with the 0.4.1 validator;
@@ -281,7 +354,8 @@ floor, that entry is now an **error**: set `tier_shape: unknown` and
 - The `any` tier shape was removed: a program documenting no severity floor is `low_and_above`.
   (Superseded — see the unstated-floor fix above.)
 
-[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/KhomDev/bounty-economics/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/KhomDev/bounty-economics/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/KhomDev/bounty-economics/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/KhomDev/bounty-economics/compare/v0.3.0...v0.4.0

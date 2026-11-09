@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -91,6 +92,25 @@ def test_the_unstated_example_keeps_tier_shape_unknown():
 
 
 # ---------------------------------------------------------------- the README
+
+
+def test_markdown_check_accepts_the_tree():
+    import check_markdown
+
+    assert check_markdown.main() == 0
+
+
+def test_the_validate_script_runner_exits_zero():
+    # README: `python tests/test_validate.py` runs the fixture-free tests.
+    # Parametrized cases used to be called with no arguments, so the command
+    # exited 1.
+    script = ROOT / "tests" / "test_validate.py"
+    result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    # The audit-fix tests are defined after the runner helper. The script used
+    # to exit before defining them, so this name has to actually have run.
+    assert "test_a_pattern_viability_gate_cannot_compile_is_an_error" in result.stdout
+    assert "FAIL" not in result.stdout and "ERROR" not in result.stdout
 
 
 def test_readme_quotes_the_real_counts():
@@ -211,7 +231,7 @@ def test_the_json_schema_rejects_an_unknown_field():
         {
             "id": "x",
             "tier_shape": "unknown",
-            "source_url": "https://real.example.org/x",
+            "source_url": "https://docs.real-program.org/x",
             "retrieved": "2026-10-01",
             "smuggled": True,
         }
@@ -227,7 +247,7 @@ def test_the_json_schema_rejects_a_floor_status_outside_the_enum():
             "id": "x",
             "tier_shape": "unknown",
             "floor_status": "probably",
-            "source_url": "https://real.example.org/x",
+            "source_url": "https://docs.real-program.org/x",
             "retrieved": "2026-10-01",
         }
     ]

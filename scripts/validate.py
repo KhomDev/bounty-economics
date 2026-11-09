@@ -87,22 +87,37 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # Placeholder hosts: a source_url on one of these was copied without editing.
 # Matched against the URL's HOST, never as a substring of the whole URL - a real
 # repository called "todo-list" is not a placeholder.
-PLACEHOLDER_HOSTS = ("example.com", "www.example.com", "localhost", "127.0.0.1")
+#
+# example.com / example.org / example.net are the RFC 2606 documentation
+# domains. Every subdomain is reserved too: matching only the apex (and a
+# single www label) accepted https://rewards.example.com/ as a real citation.
+# myexample.com does not match, because it is a different registrable name.
+RESERVED_EXAMPLE_DOMAINS = ("example.com", "example.org", "example.net")
+PLACEHOLDER_HOSTS = ("localhost", "127.0.0.1", "::1", "0.0.0.0")
 PLACEHOLDER_SUFFIXES = (".invalid", ".localhost")
 PLACEHOLDER_LABELS = ("todo", "tbd", "changeme")
 
 STALE_DAYS = 180
 
-# Constructs Python's `re` accepts but viability-gate's Rust `regex` crate does
-# not. A ledger is read by both tools, so a pattern must be in their common
-# subset: one that compiles here and fails there would make vg's G2 fail.
-UNSUPPORTED_REGEX = (
-    (re.compile(r"\(\?<?[=!]"), "lookaround"),
-    (re.compile(r"(?<!\\)\\[1-9]"), "a numbered backreference"),
-    (re.compile(r"\(\?P=|\\k<"), "a named backreference"),
-    (re.compile(r"\(\?>"), "an atomic group"),
-    (re.compile(r"[*+?}][+]"), "a possessive quantifier"),
-)
+
+def today() -> dt.date:
+    """The calendar date the age check uses.
+
+    viability-gate counts days in UTC. A local date would accept a retrieved
+    value that gate then rejects as future, or the reverse, off UTC.
+    """
+    return dt.datetime.now(dt.timezone.utc).date()
+
+# Python `re` and viability-gate's Rust `regex` (1.13, the crate vg v0.5.0
+# pins) do not share these constructs. A ledger is read by both tools, so a
+# pattern must be in the common subset. Two of the differences are easy to
+# miss: `++` is possessive in Python and a nested quantifier `(a+)+` in Rust,
+# so both compile it and then disagree on what it matches; and a character
+# class such as `[*+]` contains the same two characters without being a
+# quantifier. The check is a scan, not a regex over the pattern, so a class
+# is not mistaken for the quantifier.
+_PYTHON_ONLY_FLAGS = frozenset("aL")
+_QUANTIFIER_CHARS = frozenset("*+?")
 
 # Schema errors the semantic checks below already report with a better
 # message. Everything else the schema finds (unknown keys, wrong types, bad
@@ -110,26 +125,119 @@ UNSUPPORTED_REGEX = (
 _SCHEMA_COVERED = {"required", "enum", "const", "pattern", "minLength"}
 
 
+def _reserved_example(host: str) -> bool:
+    return any(host == root or host.endswith("." + root) for root in RESERVED_EXAMPLE_DOMAINS)
+
+
 def placeholder_host(url: str) -> str | None:
     """The placeholder host in url, or None."""
     host = (urlparse(url).hostname or "").lower().rstrip(".")
     if not host:
         return None
-    if host in PLACEHOLDER_HOSTS or host.endswith(PLACEHOLDER_SUFFIXES):
+    if host in PLACEHOLDER_HOSTS or host.endswith(PLACEHOLDER_SUFFIXES) or _reserved_example(host):
         return host
     if any(label in PLACEHOLDER_LABELS for label in host.split(".")):
         return host
     return None
 
 
+def _brace_quantifier_closes(pattern: str, close: int) -> bool:
+    """True when pattern[close] is the '}' of a `{n}`, `{n,}` or `{n,m}`."""
+    j = close - 1
+    saw_digit = False
+    while j >= 0 and pattern[j].isdigit():
+        saw_digit = True
+        j -= 1
+    if j >= 0 and pattern[j] == ",":
+        j -= 1
+        while j >= 0 and pattern[j].isdigit():
+            saw_digit = True
+            j -= 1
+    return saw_digit and j >= 0 and pattern[j] == "{"
+
+
+def _dialect_problem(pattern: str) -> str | None:
+    """Why pattern is outside the dialect both tools share, or None."""
+    n = len(pattern)
+    i = 0
+    in_class = False
+    while i < n:
+        char = pattern[i]
+        if char == "\\":
+            if i + 1 >= n:
+                break
+            nxt = pattern[i + 1]
+            if nxt.isdigit():
+                # `\1` is a backreference, `\0` is NUL here and a rejected
+                # backreference in Rust, `\141` is a Python octal escape.
+                return "a backreference or octal escape"
+            if nxt == "Z":
+                return "the \\Z end marker (Rust regex recognizes \\z, not \\Z)"
+            if nxt == "g":
+                return "a \\g backreference"
+            if nxt == "k" and i + 2 < n and pattern[i + 2] in "<'":
+                return "a named backreference"
+            i += 2
+            continue
+        if in_class:
+            if char == "]":
+                in_class = False
+            i += 1
+            continue
+        if char == "[":
+            in_class = True
+            i += 1
+            # `]` immediately after `[` or `[^` is a member of the class,
+            # not the end of it (`[]*+]` is the three characters ] * +).
+            if i < n and pattern[i] == "^":
+                i += 1
+            if i < n and pattern[i] == "]":
+                i += 1
+            continue
+        if pattern.startswith("(?", i):
+            rest = pattern[i + 2 :]
+            if rest.startswith(("=", "!", "<=", "<!")):
+                return "lookaround"
+            if rest.startswith(">"):
+                return "an atomic group"
+            if rest.startswith("#"):
+                return "a comment group"
+            if rest.startswith("("):
+                return "a conditional"
+            if rest.startswith("P="):
+                return "a named backreference"
+            if not rest.startswith(("P<", "<")):
+                flags: list[str] = []
+                k = 0
+                while k < len(rest) and rest[k] in "-aiLmsux:":
+                    if rest[k] in "aiLmsux":
+                        flags.append(rest[k])
+                    if rest[k] == ":":
+                        break
+                    k += 1
+                if any(flag in _PYTHON_ONLY_FLAGS for flag in flags):
+                    return "a Python-only inline flag"
+        if char in _QUANTIFIER_CHARS and i + 1 < n and pattern[i + 1] == "+":
+            return "a possessive quantifier"
+        if (
+            char == "}"
+            and i + 1 < n
+            and pattern[i + 1] == "+"
+            and _brace_quantifier_closes(pattern, i)
+        ):
+            return "a possessive quantifier"
+        i += 1
+    return None
+
+
 def regex_problem(pattern: str) -> str | None:
     """Why pattern is unusable by both tools, or None."""
-    for probe, name in UNSUPPORTED_REGEX:
-        if probe.search(pattern):
-            return (
-                f"uses {name}, which viability-gate's Rust regex does not support "
-                f"(no lookaround, no backreferences)"
-            )
+    reason = _dialect_problem(pattern)
+    if reason:
+        return (
+            f"uses {reason}; viability-gate compiles patterns with Rust's regex "
+            f"crate, and the two engines do not agree on this construct"
+        )
     try:
         re.compile(pattern, re.IGNORECASE)
     except re.error as err:
@@ -213,6 +321,10 @@ def validate_entry(
     as_text = dict(entry)
     if isinstance(as_text.get("retrieved"), dt.date):
         as_text["retrieved"] = as_text["retrieved"].isoformat()
+    elif isinstance(as_text.get("retrieved"), str):
+        as_text["retrieved"] = as_text["retrieved"].strip()
+    if isinstance(as_text.get("source_url"), str):
+        as_text["source_url"] = as_text["source_url"].strip()
     errors.extend(schema_errors(as_text, where))
 
     # --- ledger format version -------------------------------------------
@@ -274,7 +386,8 @@ def validate_entry(
         if expected and floor and floor != expected:
             warnings.append(
                 f"{where}: tier_shape '{shape}' implies floor '{expected}' "
-                f"but floor_severity is '{floor}' — check which is right."
+                f"but floor_severity is '{floor}'. viability-gate's G1 uses the "
+                f"stricter of the two; fix the one that does not match the reward table."
             )
         if shape != "unknown" and not floor:
             warnings.append(f"{where}: tier_shape is set but floor_severity is empty.")
@@ -344,6 +457,12 @@ def validate_entry(
 
     # --- citation (the important part) -----------------------------------
     url = entry.get("source_url")
+    if isinstance(url, str) and url != url.strip():
+        warnings.append(
+            f"{where}: source_url has surrounding whitespace. It was checked "
+            f"without the space; quote the URL so every consumer agrees."
+        )
+        url = url.strip()
     if not url:
         errors.append(
             f"{where}: missing 'source_url'. An uncited entry is a guess, "
@@ -366,6 +485,12 @@ def validate_entry(
                 )
 
     retrieved = entry.get("retrieved")
+    if isinstance(retrieved, str) and retrieved != retrieved.strip():
+        warnings.append(
+            f"{where}: retrieved has surrounding whitespace. It was checked "
+            f"without the space; quote the date ({retrieved.strip()!r})."
+        )
+        retrieved = retrieved.strip()
     if not retrieved:
         errors.append(f"{where}: missing 'retrieved' date.")
     else:
@@ -382,7 +507,7 @@ def validate_entry(
             errors.append(f"{where}: retrieved must be YYYY-MM-DD, got {text!r}")
         else:
             try:
-                age = (dt.date.today() - dt.date.fromisoformat(text)).days
+                age = (today() - dt.date.fromisoformat(text)).days
             except ValueError:
                 errors.append(f"{where}: retrieved {text!r} is not a valid date")
             else:
@@ -414,7 +539,25 @@ def validate_entry(
         if not exc.get("clause"):
             errors.append(f"{where}: exclusions[{j}] missing verbatim 'clause'")
         pattern = exc.get("pattern")
-        if pattern:
+        if isinstance(pattern, str):
+            stripped = pattern.strip()
+            if not stripped:
+                errors.append(
+                    f"{where}: exclusions[{j}].pattern is empty. Omit the key, "
+                    f"or write the expression. viability-gate treats a blank "
+                    f"pattern as untested."
+                )
+            else:
+                if stripped != pattern:
+                    errors.append(
+                        f"{where}: exclusions[{j}].pattern has leading or trailing "
+                        f"whitespace. viability-gate trims it before compiling, so "
+                        f"the two tools would not test the same expression."
+                    )
+                problem = regex_problem(stripped)
+                if problem:
+                    errors.append(f"{where}: exclusions[{j}].pattern {problem}")
+        elif pattern:
             problem = regex_problem(str(pattern))
             if problem:
                 errors.append(f"{where}: exclusions[{j}].pattern {problem}")
@@ -529,10 +672,17 @@ def main(argv: list[str] | None = None) -> int:
         example_mode = args.example_mode or path.name.endswith(".example.yaml")
 
         try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8-sig"))
+            documents = list(yaml.safe_load_all(path.read_text(encoding="utf-8-sig")))
         except yaml.YAMLError as err:
             return fail(f"cannot parse YAML in {path}: {err}")
 
+        # safe_load keeps only the first document. A second `---` block was
+        # accepted and then ignored, so entries after it were never checked.
+        if len(documents) != 1:
+            return fail(
+                f"ledger must be a single YAML document ({len(documents)} found): {path}"
+            )
+        data = documents[0]
         if data is None:
             return fail(f"ledger is empty: {path}")
         if not isinstance(data, list):
@@ -548,10 +698,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             errors.extend(entry_errors)
             warnings.extend(entry_warnings)
-            if isinstance(entry, dict) and entry.get("id"):
-                if entry["id"] in seen_ids:
-                    errors.append(f"duplicate id: {entry['id']!r}")
-                seen_ids.add(entry["id"])
+            # Only strings are hashed. A list or mapping is already a schema
+            # error; putting it in the set raises TypeError and the ledger
+            # never gets a report.
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                ident = entry["id"]
+                if ident in seen_ids:
+                    errors.append(f"duplicate id: {ident!r}")
+                seen_ids.add(ident)
 
         results.append(
             {

@@ -103,6 +103,16 @@ jobs:
           cd /tmp
           /tmp/wheel-venv/bin/bounty-econ-validate --taxonomy > /dev/null
           /tmp/wheel-venv/bin/bounty-econ-validate "$ledger" --format json > /dev/null
+          # crossref.py resolves data the same way the installed validator does.
+          # Before this, the module looked next to site-packages and missed the
+          # packaged gate-crossref.yaml.
+          /tmp/wheel-venv/bin/python - <<'PY'
+          import bounty_economics.crossref as crossref
+          data = crossref.load_crossref()
+          assert "design_review" in data["not_program_terms"], data["not_program_terms"]
+          record = crossref.gate_record("G2_exclusion_clause", data)
+          assert record and record["entries"], record
+          PY
           if ls /tmp/wheel-venv/lib/python*/site-packages/validate.py 2>/dev/null; then
             echo "::error::the package installed a top-level module called validate"
             exit 1

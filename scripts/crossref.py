@@ -16,6 +16,7 @@ Usage:
     python scripts/crossref.py                 # print the whole cross-reference
     python scripts/crossref.py G2_exclusion_clause   # print the catalog for one gate
     python scripts/crossref.py --format json   # the full mapping as JSON
+    python scripts/crossref.py G1_severity_floor --format json
 """
 
 from __future__ import annotations
@@ -31,11 +32,18 @@ except ImportError:  # pragma: no cover
     print("crossref: PyYAML is required (pip install pyyaml)", file=sys.stderr)
     raise SystemExit(2) from None
 
-ROOT = Path(__file__).resolve().parent.parent
-CROSSREF_FILE = ROOT / "data" / "gate-crossref.yaml"
+# scripts/ is on the path when this file is run as a script or imported by the
+# tests. Installed, the module is bounty_economics.crossref and `validate` is
+# not a top-level name; the data root is the one validate.py already resolves
+# for a checkout and for a wheel.
+_HERE = Path(__file__).resolve().parent
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(_HERE))
+    from validate import ROOT, load_taxonomies
+else:
+    from .validate import ROOT, load_taxonomies
 
-sys.path.insert(0, str(ROOT / "scripts"))
-from validate import load_taxonomies  # noqa: E402
+CROSSREF_FILE = ROOT / "data" / "gate-crossref.yaml"
 
 # catalog name in gate-crossref.yaml -> (loader-key, data file)
 CATALOGS = {
@@ -60,6 +68,30 @@ def catalog_entries(catalog: str) -> list[str]:
     if catalog == "clause-classes":
         return list(clauses)
     return []
+
+
+def gate_record(gate: str, cross: dict) -> dict | None:
+    """One gate as a JSON object, or None when the token is unknown."""
+    answered = cross.get("answered_here", {})
+    not_terms = cross.get("not_program_terms", {})
+    if gate in answered:
+        info = answered[gate]
+        catalog = info["catalog"]
+        return {
+            "gate": gate,
+            "answered": True,
+            "catalog": catalog,
+            "source": CATALOGS.get(catalog),
+            "read": info["read"].strip(),
+            "entries": catalog_entries(catalog),
+        }
+    if gate in not_terms:
+        return {
+            "gate": gate,
+            "answered": False,
+            "where": not_terms[gate],
+        }
+    return None
 
 
 def print_gate(gate: str, cross: dict) -> int:
@@ -103,8 +135,26 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     cross = load_crossref()
-    if args.format == "json":
+    if args.format == "json" and not args.gate:
         print(json.dumps(cross, indent=2))
+        return 0
+    if args.format == "json" and args.gate:
+        record = gate_record(args.gate, cross)
+        if record is None:
+            known = sorted(
+                set(cross.get("answered_here", {})) | set(cross.get("not_program_terms", {}))
+            )
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": f"unknown gate token {args.gate!r}",
+                        "known": known,
+                    }
+                )
+            )
+            return 1
+        print(json.dumps(record, indent=2))
         return 0
     if args.gate:
         return print_gate(args.gate, cross)
