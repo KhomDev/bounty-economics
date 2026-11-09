@@ -42,7 +42,7 @@ def entry(**over: object) -> dict:
         "tier_shape": "medium_and_above",
         "floor_status": "documented",
         "floor_severity": "medium",
-        "source_url": "https://real.example.org/rewards",
+        "source_url": "https://docs.real-program.org/rewards",
         "retrieved": "2026-10-01",
     }
     base.update(over)
@@ -511,14 +511,46 @@ def test_schema_errors_are_not_duplicated_for_a_missing_citation():
 
 @pytest.mark.parametrize(
     "pattern",
-    ["(?<!un)privileged", "(?=admin)owner", "(owner)\\1", "(?P<r>owner)(?P=r)", "a++"],
+    [
+        "(?<!un)privileged",
+        "(?=admin)owner",
+        "(owner)\\1",
+        "(?P<r>owner)(?P=r)",
+        "a++",
+        "a{1,2}+",
+        "(?#comment)admin",
+        "(a)?(?(1)admin|owner)",
+        r"foo\Z",
+        r"\0",
+        "(?a)admin",
+        r"(?<n>a)\k<n>",
+    ],
 )
 def test_a_pattern_viability_gate_cannot_compile_is_an_error(pattern):
     # REPRODUCED: a lookbehind passed here and was "invalid regex" in vg's G2.
+    # Also: `(?#...)`, `\Z`, `\0` and `(?a)` compile in Python and not in Rust;
+    # `++` compiles in both and means a different language in each.
     errors, _ = check(
         entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": pattern}])
     )
-    assert any("exclusions[0].pattern" in x for x in errors), errors
+    assert any("exclusions[0].pattern" in x for x in errors), (pattern, errors)
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    ["[*+]", "[a*+?]", r"a}+", r"\*+", r"\\1", "(?P<name>owner|admin)", "(?i)admin"],
+)
+def test_a_pattern_both_engines_share_is_accepted(pattern):
+    # The old scanner treated any `*+` or `}+` as possessive, so a character
+    # class and a literal brace were rejected even though both engines accept
+    # them and agree on the language.
+    from validate import regex_problem
+
+    assert regex_problem(pattern) is None, (pattern, regex_problem(pattern))
+    errors, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": pattern}])
+    )
+    assert not any("pattern" in err for err in errors), (pattern, errors)
 
 
 def test_every_suggested_pattern_is_in_the_common_dialect():
@@ -596,7 +628,7 @@ def test_a_non_string_id_is_reported_instead_of_crashing(capsys, tmp_path):
         "- id: [not, a, slug]\n"
         "  tier_shape: unknown\n"
         "  floor_status: unstated\n"
-        "  source_url: https://real.example.org/rewards\n"
+        "  source_url: https://docs.real-program.org/rewards\n"
         '  retrieved: "2026-10-01"\n',
         encoding="utf-8",
     )

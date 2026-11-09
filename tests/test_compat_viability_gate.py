@@ -234,7 +234,7 @@ def test_vg_init_ledger_satisfies_our_schema(vg_binary: Path, tmp_path: Path):
         tier_shape="medium_and_above",
         floor_status="documented",
         floor_severity="medium",
-        source_url="https://real.example.org/rewards",
+        source_url="https://docs.real-program.org/rewards",
         retrieved="2026-10-01",
     )
     errors, _ = validate_entry(filled, 0, TIERS, CLAUSES, example_mode=False)
@@ -307,7 +307,7 @@ def test_vg_ignores_our_additive_fields_without_failing(vg_binary: Path, tmp_pat
         "  tier_shape: medium_and_above\n"
         "  floor_status: documented\n"
         "  floor_severity: medium\n"
-        "  source_url: https://real.example.org/rewards\n"
+        "  source_url: https://docs.real-program.org/rewards\n"
         "  retrieved: 2026-10-01\n"
         "  notes: \"a free-text note\"\n",
         encoding="utf-8",
@@ -351,7 +351,7 @@ def test_vg_fails_an_unstated_floor(vg_binary: Path, tmp_path: Path):
             "tier_shape": "unknown",
             "floor_status": "unstated",
             "floor_severity": None,
-            "source_url": "https://real.example.org/rewards",
+            "source_url": "https://docs.real-program.org/rewards",
             "retrieved": "2026-10-01",
         },
         0,
@@ -362,7 +362,7 @@ def test_vg_fails_an_unstated_floor(vg_binary: Path, tmp_path: Path):
     ledger = _one_entry_ledger(
         tmp_path,
         "- id: unstated\n  tier_shape: unknown\n  floor_status: unstated\n"
-        "  floor_severity: null\n  source_url: \"https://real.example.org/rewards\"\n"
+        "  floor_severity: null\n  source_url: \"https://docs.real-program.org/rewards\"\n"
         "  retrieved: \"2026-10-01\"\n",
     )
     g1 = _gates(vg_binary, "--ledger", str(ledger))["G1"]
@@ -378,7 +378,7 @@ def test_every_pattern_we_ship_compiles_in_vg(vg_binary: Path, tmp_path: Path):
         "  tier_shape: medium_and_above",
         "  floor_status: documented",
         "  floor_severity: medium",
-        "  source_url: \"https://real.example.org/rewards\"",
+        "  source_url: \"https://docs.real-program.org/rewards\"",
         "  retrieved: \"2026-10-01\"",
         "  exclusions:",
     ]
@@ -401,7 +401,7 @@ def test_vg_runs_our_exclusion_patterns_over_a_draft(vg_binary: Path, tmp_path: 
     ledger = _one_entry_ledger(
         tmp_path,
         "- id: g2\n  tier_shape: medium_and_above\n  floor_status: documented\n"
-        "  floor_severity: medium\n  source_url: \"https://real.example.org/rewards\"\n"
+        "  floor_severity: medium\n  source_url: \"https://docs.real-program.org/rewards\"\n"
         "  retrieved: \"2026-10-01\"\n  exclusions:\n    - class: privileged_role\n"
         "      clause: \"Attacks requiring privileged access\"\n"
         "      pattern: \"(owner|admin) (can|must)\"\n",

@@ -211,7 +211,7 @@ def test_the_json_schema_rejects_an_unknown_field():
         {
             "id": "x",
             "tier_shape": "unknown",
-            "source_url": "https://real.example.org/x",
+            "source_url": "https://docs.real-program.org/x",
             "retrieved": "2026-10-01",
             "smuggled": True,
         }
@@ -227,7 +227,7 @@ def test_the_json_schema_rejects_a_floor_status_outside_the_enum():
             "id": "x",
             "tier_shape": "unknown",
             "floor_status": "probably",
-            "source_url": "https://real.example.org/x",
+            "source_url": "https://docs.real-program.org/x",
             "retrieved": "2026-10-01",
         }
     ]

@@ -99,16 +99,16 @@ PLACEHOLDER_LABELS = ("todo", "tbd", "changeme")
 
 STALE_DAYS = 180
 
-# Constructs Python's `re` accepts but viability-gate's Rust `regex` crate does
-# not. A ledger is read by both tools, so a pattern must be in their common
-# subset: one that compiles here and fails there would make vg's G2 fail.
-UNSUPPORTED_REGEX = (
-    (re.compile(r"\(\?<?[=!]"), "lookaround"),
-    (re.compile(r"(?<!\\)\\[1-9]"), "a numbered backreference"),
-    (re.compile(r"\(\?P=|\\k<"), "a named backreference"),
-    (re.compile(r"\(\?>"), "an atomic group"),
-    (re.compile(r"[*+?}][+]"), "a possessive quantifier"),
-)
+# Python `re` and viability-gate's Rust `regex` (1.13, the crate vg v0.5.0
+# pins) do not share these constructs. A ledger is read by both tools, so a
+# pattern must be in the common subset. Two of the differences are easy to
+# miss: `++` is possessive in Python and a nested quantifier `(a+)+` in Rust,
+# so both compile it and then disagree on what it matches; and a character
+# class such as `[*+]` contains the same two characters without being a
+# quantifier. The check is a scan, not a regex over the pattern, so a class
+# is not mistaken for the quantifier.
+_PYTHON_ONLY_FLAGS = frozenset("aL")
+_QUANTIFIER_CHARS = frozenset("*+?")
 
 # Schema errors the semantic checks below already report with a better
 # message. Everything else the schema finds (unknown keys, wrong types, bad
@@ -132,14 +132,103 @@ def placeholder_host(url: str) -> str | None:
     return None
 
 
+def _brace_quantifier_closes(pattern: str, close: int) -> bool:
+    """True when pattern[close] is the '}' of a `{n}`, `{n,}` or `{n,m}`."""
+    j = close - 1
+    saw_digit = False
+    while j >= 0 and pattern[j].isdigit():
+        saw_digit = True
+        j -= 1
+    if j >= 0 and pattern[j] == ",":
+        j -= 1
+        while j >= 0 and pattern[j].isdigit():
+            saw_digit = True
+            j -= 1
+    return saw_digit and j >= 0 and pattern[j] == "{"
+
+
+def _dialect_problem(pattern: str) -> str | None:
+    """Why pattern is outside the dialect both tools share, or None."""
+    n = len(pattern)
+    i = 0
+    in_class = False
+    while i < n:
+        char = pattern[i]
+        if char == "\\":
+            if i + 1 >= n:
+                break
+            nxt = pattern[i + 1]
+            if nxt.isdigit():
+                # `\1` is a backreference, `\0` is NUL here and a rejected
+                # backreference in Rust, `\141` is a Python octal escape.
+                return "a backreference or octal escape"
+            if nxt == "Z":
+                return "the \\Z anchor (Rust regex recognizes \\z, not \\Z)"
+            if nxt == "g":
+                return "a \\g backreference"
+            if nxt == "k" and i + 2 < n and pattern[i + 2] in "<'":
+                return "a named backreference"
+            i += 2
+            continue
+        if in_class:
+            if char == "]":
+                in_class = False
+            i += 1
+            continue
+        if char == "[":
+            in_class = True
+            i += 1
+            # `]` immediately after `[` or `[^` is a member of the class,
+            # not the end of it (`[]*+]` is the three characters ] * +).
+            if i < n and pattern[i] == "^":
+                i += 1
+            if i < n and pattern[i] == "]":
+                i += 1
+            continue
+        if pattern.startswith("(?", i):
+            rest = pattern[i + 2 :]
+            if rest.startswith(("=", "!", "<=", "<!")):
+                return "lookaround"
+            if rest.startswith(">"):
+                return "an atomic group"
+            if rest.startswith("#"):
+                return "a comment group"
+            if rest.startswith("("):
+                return "a conditional"
+            if rest.startswith("P="):
+                return "a named backreference"
+            if not rest.startswith(("P<", "<")):
+                flags: list[str] = []
+                k = 0
+                while k < len(rest) and rest[k] in "-aiLmsux:":
+                    if rest[k] in "aiLmsux":
+                        flags.append(rest[k])
+                    if rest[k] == ":":
+                        break
+                    k += 1
+                if any(flag in _PYTHON_ONLY_FLAGS for flag in flags):
+                    return "a Python-only inline flag"
+        if char in _QUANTIFIER_CHARS and i + 1 < n and pattern[i + 1] == "+":
+            return "a possessive quantifier"
+        if (
+            char == "}"
+            and i + 1 < n
+            and pattern[i + 1] == "+"
+            and _brace_quantifier_closes(pattern, i)
+        ):
+            return "a possessive quantifier"
+        i += 1
+    return None
+
+
 def regex_problem(pattern: str) -> str | None:
     """Why pattern is unusable by both tools, or None."""
-    for probe, name in UNSUPPORTED_REGEX:
-        if probe.search(pattern):
-            return (
-                f"uses {name}, which viability-gate's Rust regex does not support "
-                f"(no lookaround, no backreferences)"
-            )
+    reason = _dialect_problem(pattern)
+    if reason:
+        return (
+            f"uses {reason}; viability-gate compiles patterns with Rust's regex "
+            f"crate, and the two engines do not agree on this construct"
+        )
     try:
         re.compile(pattern, re.IGNORECASE)
     except re.error as err:
