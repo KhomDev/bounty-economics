@@ -172,7 +172,7 @@ def _dialect_problem(pattern: str) -> str | None:
                 # backreference in Rust, `\141` is a Python octal escape.
                 return "a backreference or octal escape"
             if nxt == "Z":
-                return "the \\Z anchor (Rust regex recognizes \\z, not \\Z)"
+                return "the \\Z end marker (Rust regex recognizes \\z, not \\Z)"
             if nxt == "g":
                 return "a \\g backreference"
             if nxt == "k" and i + 2 < n and pattern[i + 2] in "<'":

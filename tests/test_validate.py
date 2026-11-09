@@ -611,14 +611,14 @@ def test_a_future_retrieved_date_is_an_error():
 def test_retrieved_age_is_counted_in_utc(monkeypatch):
     import validate as validate_mod
 
-    anchor = date(2026, 11, 9)
-    monkeypatch.setattr(validate_mod, "today", lambda: anchor)
+    as_of = date(2026, 11, 9)
+    monkeypatch.setattr(validate_mod, "today", lambda: as_of)
     errors, _ = check(entry(retrieved="2026-11-10"))
     assert any("future" in err for err in errors), errors
-    stale = anchor.fromordinal(anchor.toordinal() - (validate_mod.STALE_DAYS + 1))
+    stale = as_of.fromordinal(as_of.toordinal() - (validate_mod.STALE_DAYS + 1))
     _, warnings = check(entry(retrieved=stale.isoformat()))
     assert any(f"{validate_mod.STALE_DAYS + 1} days" in w for w in warnings), warnings
-    fresh = anchor.fromordinal(anchor.toordinal() - validate_mod.STALE_DAYS)
+    fresh = as_of.fromordinal(as_of.toordinal() - validate_mod.STALE_DAYS)
     _, warnings = check(entry(retrieved=fresh.isoformat()))
     assert not any("days ago" in w for w in warnings), warnings
 
