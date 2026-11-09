@@ -602,9 +602,70 @@ def test_a_placeholder_host_is_caught_by_host(url):
 
 
 def test_a_future_retrieved_date_is_an_error():
-    future = (date.today().replace(year=date.today().year + 1)).isoformat()
+    # 15 January next year is always a real date, including in a leap year.
+    future = date(date.today().year + 1, 1, 15).isoformat()
     errors, _ = check(entry(retrieved=future))
     assert any("future" in x for x in errors), errors
+
+
+def test_retrieved_age_is_counted_in_utc(monkeypatch):
+    import validate as validate_mod
+
+    anchor = date(2026, 11, 9)
+    monkeypatch.setattr(validate_mod, "today", lambda: anchor)
+    errors, _ = check(entry(retrieved="2026-11-10"))
+    assert any("future" in err for err in errors), errors
+    stale = anchor.fromordinal(anchor.toordinal() - (validate_mod.STALE_DAYS + 1))
+    _, warnings = check(entry(retrieved=stale.isoformat()))
+    assert any(f"{validate_mod.STALE_DAYS + 1} days" in w for w in warnings), warnings
+    fresh = anchor.fromordinal(anchor.toordinal() - validate_mod.STALE_DAYS)
+    _, warnings = check(entry(retrieved=fresh.isoformat()))
+    assert not any("days ago" in w for w in warnings), warnings
+
+
+def test_a_second_yaml_document_is_not_silently_dropped(capsys, tmp_path):
+    bad = tmp_path / "ledger.yaml"
+    bad.write_text(
+        "- id: one\n"
+        "  tier_shape: unknown\n"
+        "  floor_status: unstated\n"
+        "  source_url: https://docs.real-program.org/one\n"
+        '  retrieved: "2026-10-01"\n'
+        "---\n"
+        "- id: two\n"
+        "  tier_shape: unknown\n"
+        "  floor_status: unstated\n"
+        "  source_url: https://docs.real-program.org/two\n"
+        '  retrieved: "2026-10-01"\n',
+        encoding="utf-8",
+    )
+    code = main(["--format", "json", str(bad)])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 2, payload
+    assert "single YAML document" in payload["error"]
+
+
+def test_a_blank_or_padded_pattern_is_an_error():
+    empty, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": "   "}])
+    )
+    assert any("empty" in err for err in empty), empty
+    padded, _ = check(
+        entry(exclusions=[{"class": "privileged_role", "clause": "c", "pattern": " admin "}])
+    )
+    assert any("whitespace" in err for err in padded), padded
+
+
+def test_padded_citation_fields_are_checked_without_the_space():
+    errors, warnings = check(
+        entry(
+            source_url="  https://docs.real-program.org/rewards  ",
+            retrieved="  2026-10-01  ",
+        )
+    )
+    assert errors == [], errors
+    assert any("source_url has surrounding whitespace" in w for w in warnings), warnings
+    assert any("retrieved has surrounding whitespace" in w for w in warnings), warnings
 
 
 def test_a_conflicting_floor_beside_a_settled_shape_is_an_error():

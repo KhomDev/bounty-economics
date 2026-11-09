@@ -324,17 +324,21 @@ It warns on the things that cost the most:
 - **`tier_shape: unknown`** — not permissive. An untranscribed program is an unhedged bet.
 - **`tier_shape: critical_only` / `high_and_above`** — pays nothing below that bar, so confirm
   your thesis can reach it before hunting.
-- **`retrieved` older than 180 days** — program terms change without notice; re-read the page.
+- **`retrieved` older than 180 days** — program terms change without notice; re-read the page. The age is counted in UTC, the same clock viability-gate uses.
 - **`prior_audits[].covers` missing** — a report naming a file is not the same as covering your
   function.
 
 It **errors** on the contradictions: an unstated or conflicting floor beside a shape other than
 `unknown`, a documented floor with no `floor_severity`, a documented floor beside `unknown`, a
-`retrieved` date in the future, a pattern viability-gate cannot compile, an unknown key, a
-`schema_version` this validator does not implement, and of course a missing citation.
+`retrieved` date in the future, a pattern viability-gate cannot compile (or a blank pattern, or
+one with surrounding whitespace — viability-gate trims before it compiles, so the two tools would
+otherwise test different expressions), an unknown key, a
+`schema_version` this validator does not implement, a file that contains more than one YAML
+document, and of course a missing citation.
 
 It also flags a **floor conflict**: if `tier_shape` implies a floor of `medium` but
-`floor_severity` says `high`, one of them is wrong and it says so.
+`floor_severity` says `high`, one of them is wrong. The warning names both, and
+viability-gate's G1 uses the stricter of the two.
 
 Placeholder hosts are an **error** in a real ledger and a warning in a file named
 `*.example.yaml`, so the shipped examples validate while a copied-and-not-edited ledger does not.
