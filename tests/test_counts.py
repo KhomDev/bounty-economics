@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -91,6 +92,19 @@ def test_the_unstated_example_keeps_tier_shape_unknown():
 
 
 # ---------------------------------------------------------------- the README
+
+
+def test_the_validate_script_runner_exits_zero():
+    # README: `python tests/test_validate.py` runs the fixture-free tests.
+    # Parametrized cases used to be called with no arguments, so the command
+    # exited 1.
+    script = ROOT / "tests" / "test_validate.py"
+    result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    # The audit-fix tests are defined after the runner helper. The script used
+    # to exit before defining them, so this name has to actually have run.
+    assert "test_a_pattern_viability_gate_cannot_compile_is_an_error" in result.stdout
+    assert "FAIL" not in result.stdout and "ERROR" not in result.stdout
 
 
 def test_readme_quotes_the_real_counts():

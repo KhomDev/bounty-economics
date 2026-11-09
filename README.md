@@ -353,7 +353,8 @@ flagged. A host is a placeholder when it is:
 ### Tests
 
 ```bash
-python -m pytest tests/ -q     # or: python tests/test_validate.py
+python -m pytest tests/ -q          # the full suite
+python tests/test_validate.py       # fixture-free tests from that file; pytest is optional
 ```
 
 Four suites:
