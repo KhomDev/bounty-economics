@@ -578,6 +578,25 @@ def test_the_any_migration_message_distinguishes_explicit_from_absent():
     assert "low_and_above" in joined and "unstated" in joined, joined
 
 
+def test_a_non_string_id_is_reported_instead_of_crashing(capsys, tmp_path):
+    # A YAML list (or mapping) is unhashable. The duplicate-id set used to
+    # raise TypeError before the schema error could be reported.
+    bad = tmp_path / "ledger.yaml"
+    bad.write_text(
+        "- id: [not, a, slug]\n"
+        "  tier_shape: unknown\n"
+        "  floor_status: unstated\n"
+        "  source_url: https://real.example.org/rewards\n"
+        '  retrieved: "2026-10-01"\n',
+        encoding="utf-8",
+    )
+    code = main(["--format", "json", str(bad)])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == 1, payload
+    assert payload["ok"] is False
+    assert any("id" in err for err in payload["errors"]), payload["errors"]
+
+
 def test_the_schema_and_the_readme_agree_on_an_explicit_none_floor():
     # REPRODUCED: the README said "SEVERITY FLOOR: NONE" is documented +
     # low_and_above while the schema said it is unknown + unstated.

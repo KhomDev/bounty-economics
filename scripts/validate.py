@@ -548,10 +548,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             errors.extend(entry_errors)
             warnings.extend(entry_warnings)
-            if isinstance(entry, dict) and entry.get("id"):
-                if entry["id"] in seen_ids:
-                    errors.append(f"duplicate id: {entry['id']!r}")
-                seen_ids.add(entry["id"])
+            # Only strings are hashed. A list or mapping is already a schema
+            # error; putting it in the set raises TypeError and the ledger
+            # never gets a report.
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
+                ident = entry["id"]
+                if ident in seen_ids:
+                    errors.append(f"duplicate id: {ident!r}")
+                seen_ids.add(ident)
 
         results.append(
             {
