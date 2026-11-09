@@ -87,7 +87,13 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # Placeholder hosts: a source_url on one of these was copied without editing.
 # Matched against the URL's HOST, never as a substring of the whole URL - a real
 # repository called "todo-list" is not a placeholder.
-PLACEHOLDER_HOSTS = ("example.com", "www.example.com", "localhost", "127.0.0.1")
+#
+# example.com / example.org / example.net are the RFC 2606 documentation
+# domains. Every subdomain is reserved too: matching only the apex (and a
+# single www label) accepted https://rewards.example.com/ as a real citation.
+# myexample.com does not match, because it is a different registrable name.
+RESERVED_EXAMPLE_DOMAINS = ("example.com", "example.org", "example.net")
+PLACEHOLDER_HOSTS = ("localhost", "127.0.0.1", "::1", "0.0.0.0")
 PLACEHOLDER_SUFFIXES = (".invalid", ".localhost")
 PLACEHOLDER_LABELS = ("todo", "tbd", "changeme")
 
@@ -110,12 +116,16 @@ UNSUPPORTED_REGEX = (
 _SCHEMA_COVERED = {"required", "enum", "const", "pattern", "minLength"}
 
 
+def _reserved_example(host: str) -> bool:
+    return any(host == root or host.endswith("." + root) for root in RESERVED_EXAMPLE_DOMAINS)
+
+
 def placeholder_host(url: str) -> str | None:
     """The placeholder host in url, or None."""
     host = (urlparse(url).hostname or "").lower().rstrip(".")
     if not host:
         return None
-    if host in PLACEHOLDER_HOSTS or host.endswith(PLACEHOLDER_SUFFIXES):
+    if host in PLACEHOLDER_HOSTS or host.endswith(PLACEHOLDER_SUFFIXES) or _reserved_example(host):
         return host
     if any(label in PLACEHOLDER_LABELS for label in host.split(".")):
         return host

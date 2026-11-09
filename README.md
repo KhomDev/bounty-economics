@@ -336,11 +336,15 @@ It **errors** on the contradictions: an unstated or conflicting floor beside a s
 It also flags a **floor conflict**: if `tier_shape` implies a floor of `medium` but
 `floor_severity` says `high`, one of them is wrong and it says so.
 
-Placeholder hosts (`example.com`, `localhost`, any `*.invalid` host, or a host with a `todo` /
-`tbd` / `changeme` label) are an **error** in a real ledger and a warning in a file named
+Placeholder hosts are an **error** in a real ledger and a warning in a file named
 `*.example.yaml`, so the shipped examples validate while a copied-and-not-edited ledger does not.
 The check reads the URL's host, so a real page whose path happens to contain "todo" is not
-flagged.
+flagged. A host is a placeholder when it is:
+
+- `example.com`, `example.org` or `example.net`, or any subdomain of those (RFC 2606; `myexample.com` is a different name and is not flagged)
+- `localhost`, `127.0.0.1`, `::1` or `0.0.0.0`
+- any `*.invalid` or `*.localhost` host
+- a host with a `todo`, `tbd` or `changeme` label
 
 ### Tests
 

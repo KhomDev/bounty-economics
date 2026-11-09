@@ -536,6 +536,8 @@ def test_every_suggested_pattern_is_in_the_common_dialect():
         "https://github.com/acme/todo-list-protocol/blob/main/BOUNTY.md",
         "https://docs.real-program.org/todo/rewards",
         "https://myexample.com/rewards",
+        "https://example.com.evil.example/rewards",
+        "https://not-example.org/rewards",
     ],
 )
 def test_a_real_url_containing_a_placeholder_word_is_not_a_placeholder(url):
@@ -552,6 +554,14 @@ def test_a_real_url_containing_a_placeholder_word_is_not_a_placeholder(url):
         "http://localhost:8000/rewards",
         "https://todo/rewards",
         "https://example.com/rewards",
+        "https://www.example.com/rewards",
+        "https://rewards.example.com/bounty",
+        "https://foo.example.org/rewards",
+        "https://example.net/rewards",
+        "http://127.0.0.1/rewards",
+        "http://[::1]/rewards",
+        "http://0.0.0.0/rewards",
+        "http://app.localhost/rewards",
     ],
 )
 def test_a_placeholder_host_is_caught_by_host(url):
