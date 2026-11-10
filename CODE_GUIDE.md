@@ -234,11 +234,11 @@ re-derivation against any dataset" (17-19). Two mappings:
   exclusion is the `design_issue` class, reached through `G2_exclusion_clause`.
 
 [tests/test_crossref.py](tests/test_crossref.py) pins the file: every token must be inside the
-hardcoded shared vocabulary `VALID_GATES` (27-44, 16 tokens, "Hardcoded on purpose"), no gate in
-both halves (62-64), every answered gate names a real catalog with a `read` note (67-70),
-catalog references resolve to real entries (73-80), the load-bearing pair
-`G1 → tier-shapes` / `G2 → clause-classes` is present (83-87), and `scripts/crossref.py`
-exits 0 for every known gate and non-zero for an unknown one (90-109).
+hardcoded shared vocabulary `VALID_GATES` (28-45, 16 tokens, "Hardcoded on purpose"), no gate in
+both halves (63-65), every answered gate names a real catalog with a `read` note (68-71),
+catalog references resolve to real entries (74-81), the load-bearing pair
+`G1 → tier-shapes` / `G2 → clause-classes` is present (134-138), and `scripts/crossref.py`
+exits 0 for every known gate and non-zero for an unknown one (141-160).
 
 The **cross-reference fields to the rejection-taxonomy vocabularies** are exactly these gate
 tokens: the gate vocabulary itself is authored in `rejection-taxonomy/data/SCHEMA.md`; this repo

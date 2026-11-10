@@ -17,9 +17,9 @@ changed.
 | Full test suite | `python -m pytest tests/ -q` | 175 passed, 0 skipped |
 | Lint | `python -m ruff check .` | clean |
 | Shipped examples | `python scripts/validate.py examples/ledger.example.yaml` and `examples/tier-shapes.example.yaml` | 6 entries, 0 errors, 10 warnings (the documented warnings) |
-| Taxonomies | `python scripts/validate.py --taxonomy` (text and JSON) | 5 tier shapes, 14 clause classes, 11 gate tokens |
+| Taxonomies | `python scripts/validate.py --taxonomy` (text and JSON) | 5 tier shapes, 14 clause classes (the gate cross-reference is a separate script) |
 | Generic-name guard | `python scripts/check_generic.py` | clean |
-| Hygiene | `python scripts/check_hygiene.py --no-history` | clean (history check skipped: private inputs absent, same as CI) |
+| Hygiene | `python scripts/check_hygiene.py --no-history` | clean. The history check is skipped by design, as in CI: published history is the owner's decision to rewrite, not a CI fix |
 | Links | `python scripts/check_links.py` | clean |
 | Markdown | `python scripts/check_markdown.py` | clean |
 | Cross-repo contract | `python -m pytest tests/test_compat_viability_gate.py` | 13 passed against the pinned viability-gate v0.5.0 |
