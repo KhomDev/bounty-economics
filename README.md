@@ -43,6 +43,7 @@ scripts/check_links.py              fails on a relative link in a document that 
 scripts/check_markdown.py           fails on a mangled code fence or a stale pinned tag
 scripts/token_scan.py               the chain / platform token vocabulary and its matcher
 scripts/__init__.py                 package marker for the installable `bounty_economics`
+docs/validation.md                  the 0.6.1 audit: what was run, what it checks, what it does not
 examples/ledger.example.yaml        one fictional entry, showing the shape
 examples/tier-shapes.example.yaml   five fictional entries, one per tier shape
 ```
@@ -358,7 +359,7 @@ python -m pytest tests/ -q          # the full suite
 python tests/test_validate.py       # fixture-free tests from that file; pytest is optional
 ```
 
-Six suites:
+Seven suites:
 
 - `tests/test_validate.py` — the validator's behaviour: an uncited entry fails, a placeholder
   host fails outside example mode, the removed `any` shape gets a migration message, an unstated
@@ -372,6 +373,8 @@ Six suites:
   resolves.
 - `tests/test_token_scan.py` — the identity-token matcher, in both directions.
 - `tests/test_compat_viability_gate.py` — the cross-repo contract below.
+- `tests/test_code_guide.py` — the line references and counts in `CODE_GUIDE.md` are still the
+  lines and counts of the tree they describe.
 
 ### Schema and cross-repo version matrix
 
@@ -521,3 +524,28 @@ reproduces none of them. (Until 0.3.0 this paragraph sat after the MIT text in `
 stopped GitHub from detecting the licence. [`LICENSE`](LICENSE) is now the MIT text alone.)
 Security reports go through GitHub's private vulnerability reporting; see
 [`SECURITY.md`](SECURITY.md).
+
+## What this does not prove
+
+The checks in this repository prove less than the prose around them can suggest. This section
+states the gap; [docs/validation.md](docs/validation.md) records the audit behind it, with the
+command and result for each check.
+
+- **Passing CI proves the checks ran, not that their subjects are right.** `pytest` and the four
+  guards verify the validator's behaviour, the counts and the vocabularies. They do not verify
+  that a taxonomy class describes a real program's clause, and no labelled corpus of program
+  pages is shipped here to test that against.
+- **The validator checks structure and citation, not truth.** It can tell that a floor was
+  recorded with a source and a date; it cannot tell that the source says what the entry claims.
+- **The cross-repo contract covers one viability-gate tag** (`v0.5.0`). It says nothing about
+  later releases until the pin in `tests/test_compat_viability_gate.py` is bumped.
+- **The audit ran on one platform and one Python version** (Windows, 3.12). CI covers Python
+  3.10 through 3.13 on Ubuntu; the local audit does not.
+- **Documentation references are guarded only where a test parses them.**
+  `tests/test_code_guide.py` re-derives the line references and counts in `CODE_GUIDE.md`;
+  other prose claims are reviewed by hand and can drift silently.
+- **The rejection figures quoted here come from another repository** (rejection-taxonomy
+  v0.6.0), not from files shipped here. They describe one researcher's log, not an industry
+  census.
+
+Reproduce the audit with the commands in [docs/validation.md](docs/validation.md).

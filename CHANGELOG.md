@@ -28,6 +28,57 @@ The tree itself is unchanged except for the tripwire fix recorded here.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-11-10
+
+A self-audit release. The ledger schema stays v1 and no taxonomy, schema, validator or example
+behaviour changed. The version moves because the audit found and fixed a documentation defect.
+
+### Fixed
+
+- **`CODE_GUIDE.md`'s line references were stale against the tree they claim to describe.** The
+  guide says it was "written against version 0.6.0" and that every claim was checked against the
+  0.6.0 tree, but several references named the wrong lines: `load_taxonomies()` was cited at
+  140-152 (actual 248-260), `entry_validator()` at 158-167 (actual 266-275), `schema_errors()`
+  at 170-177 (actual 278-285), the `tests/test_counts.py` schema assertions at 168-185 (actual
+  188-205), and `check_markdown.py` was given as 89 lines (actual 102). The verification
+  section counted "5 answered and 10 not-answered gates" while the data section correctly said
+  eleven; `data/gate-crossref.yaml` has 11. Every reference was re-derived from the 0.6.1 tree,
+  the version/date pin was updated, and the guide's layout table gained `docs/`.
+- **The guide's references are now tested.** `tests/test_code_guide.py` re-derives every
+  "(N lines)" count, every `name` (start-end) reference in the script and test sections, the
+  quoted collected-test count, the suite count and the stated version. A stale reference now
+  fails the suite instead of shipping.
+
+### Audited — no change
+
+- The full local CI equivalent passed at the audited commit (`93bb147`, v0.6.0): 169 tests with
+  no skips (the cross-repo half built viability-gate v0.5.0 from the pinned tag), `ruff check .`,
+  both shipped examples, both taxonomy prints, the four repository guards, the placeholder-host
+  negative case, and a wheel install in a clean venv run from outside the checkout.
+- README claims were checked against the code and the data: the counts and vocabularies, the
+  `floor_status` rules, the placeholder-host rules, the citation and date rules, the
+  `--format json` verdict, and the cross-repo statements about viability-gate's G1 and G2.
+- The cross-repo contract still holds at viability-gate v0.5.0: `vg init` output satisfies this
+  schema once filled in, an unstated, missing or conflicting floor fails vg's G1, and every
+  shipped exclusion pattern compiles in vg's G2.
+- No validator, schema, taxonomy or example defect reproduced. `docs/validation.md` records the
+  audit surface, the claims each check covers, and what the audit did not prove.
+
+### Not verified
+
+- The CI matrix cells for Python 3.10, 3.11 and 3.13; the audit ran on 3.12 only.
+- The cross-repo contract above the pinned viability-gate v0.5.0. Newer releases are not covered
+  until the pin is bumped, which is unchanged from 0.6.0.
+- Prose claims outside the enumerated checks, and any claim that would need a labelled corpus of
+  real program pages.
+
+### Changed
+
+- Package version 0.6.0 → 0.6.1. The ledger schema stays v1 and the viability-gate pin stays
+  `v0.5.0`.
+- Added `docs/validation.md`, and `README.md` gained a "What this does not prove" section.
+- The test suite grew from 169 to 175 collected tests with the new `tests/test_code_guide.py`.
+
 ## [0.6.0] — 2026-11-09
 
 A review release. The ledger schema is still v1. A ledger that already
@@ -354,7 +405,8 @@ floor, that entry is now an **error**: set `tier_shape: unknown` and
 - The `any` tier shape was removed: a program documenting no severity floor is `low_and_above`.
   (Superseded — see the unstated-floor fix above.)
 
-[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/KhomDev/bounty-economics/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/KhomDev/bounty-economics/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/KhomDev/bounty-economics/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/KhomDev/bounty-economics/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/KhomDev/bounty-economics/compare/v0.4.0...v0.4.1

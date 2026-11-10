@@ -5,8 +5,8 @@ tools; this document explains what every file, field, function, check and test a
 file-and-line references into the tree it describes. Read the README first; read this when you want
 to change something.
 
-**Accuracy pin.** Written against version 0.6.0 (2026-11-09). `python -m pytest tests/ -q -rs`
-collects 169 tests and `python scripts/validate.py --taxonomy` prints 5 tier shapes and 14 clause
+**Accuracy pin.** Written against version 0.6.1 (2026-11-10). `python -m pytest tests/ -q -rs`
+collects 175 tests and `python scripts/validate.py --taxonomy` prints 5 tier shapes and 14 clause
 classes. Line numbers refer to that tree and drift as the files change; the identifiers they point
 at are stable in practice. Every count in this document was derived from the files themselves (see
 [How this document is verified](#how-this-document-is-verified)).
@@ -20,19 +20,20 @@ why CI has a job that builds a Rust binary from a sibling repository.
 
 ## Repository layout
 
-Eight directories and the repository root, each with one job:
+Nine directories and the repository root, each with one job:
 
 | Path | Role |
 |---|---|
 | `data/` | The three taxonomy data files: [tier-shapes](data/tier-shapes.yaml) (5 payout-tier shapes), [clause-classes](data/clause-classes.yaml) (14 exclusion-clause classes), [gate-crossref](data/gate-crossref.yaml) (the viability-gate token cross-reference). These are DATA, not prose: `validate.py` reads them at runtime, so the docs, the schema and the validator cannot drift apart (README.md:49-50). |
 | `schemas/` | One file, [ledger.schema.json](schemas/ledger.schema.json): JSON Schema (draft 2020-12) for the private ledger format, version v1. Enforced by the validator since 0.5.0. |
 | `scripts/` | Eight Python modules: the validator ([validate.py](scripts/validate.py)), the gate-token resolver ([crossref.py](scripts/crossref.py)), the identity-token vocabulary ([token_scan.py](scripts/token_scan.py)), and the four repository guards ([check_generic.py](scripts/check_generic.py), [check_hygiene.py](scripts/check_hygiene.py), [check_links.py](scripts/check_links.py), [check_markdown.py](scripts/check_markdown.py)). [`__init__.py`](scripts/__init__.py) makes the directory importable as the installable package `bounty_economics`. |
+| `docs/` | [validation.md](docs/validation.md): the 0.6.1 audit record — what was run, what it covers, what it does not prove. |
 | `examples/` | Two fictional ledgers: [ledger.example.yaml](examples/ledger.example.yaml) (1 full entry) and [tier-shapes.example.yaml](examples/tier-shapes.example.yaml) (5 entries, one per tier shape). Every URL uses the reserved `.invalid` TLD. |
-| `tests/` | Six pytest suites, 169 collected tests: [test_validate.py](tests/test_validate.py) (validator behaviour), [test_counts.py](tests/test_counts.py) (count/vocabulary drift), [test_compat_viability_gate.py](tests/test_compat_viability_gate.py) (the cross-repo contract), [test_crossref.py](tests/test_crossref.py), [test_generic.py](tests/test_generic.py), [test_token_scan.py](tests/test_token_scan.py). |
+| `tests/` | Seven pytest suites, 175 collected tests: [test_validate.py](tests/test_validate.py) (validator behaviour), [test_counts.py](tests/test_counts.py) (count/vocabulary drift), [test_compat_viability_gate.py](tests/test_compat_viability_gate.py) (the cross-repo contract), [test_crossref.py](tests/test_crossref.py), [test_generic.py](tests/test_generic.py), [test_token_scan.py](tests/test_token_scan.py), [test_code_guide.py](tests/test_code_guide.py). |
 | `.github/workflows/` | [ci.yml](.github/workflows/ci.yml): the two CI jobs, `validate` and `compat`. |
 | `.github/ISSUE_TEMPLATE/` | [correction.md](.github/ISSUE_TEMPLATE/correction.md) and [takedown-request.md](.github/ISSUE_TEMPLATE/takedown-request.md): structured intake for "a claim is wrong" and "this text identifies a target". |
 | `.github/` | [dependabot.yml](.github/dependabot.yml): weekly, grouped bump PRs for the pinned Python tools (pip) and the GitHub Actions versions (github-actions). |
-| Root | [README.md](README.md) (the method, the schema docs, the cross-repo matrix), [CHANGELOG.md](CHANGELOG.md) (Keep-a-Changelog, versions track the ledger schema), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CITATION.cff](CITATION.cff) (version 0.6.0, released 2026-11-09), [LICENSE](LICENSE) (MIT), `pyproject.toml`, `requirements-ci.txt`, `.gitattributes`, `.gitignore`. |
+| Root | [README.md](README.md) (the method, the schema docs, the cross-repo matrix), [CHANGELOG.md](CHANGELOG.md) (Keep-a-Changelog, versions track the ledger schema), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CITATION.cff](CITATION.cff) (version 0.6.1, released 2026-11-10), [LICENSE](LICENSE) (MIT), `pyproject.toml`, `requirements-ci.txt`, `.gitattributes`, `.gitignore`. |
 
 Two conventions shape the whole tree:
 
@@ -97,7 +98,7 @@ tests/test_counts.py:188-189, and the closed-to-unknown-fields rule at 191-193. 
 12. **`notes`** (123) — string, free text.
 
 **Schema ↔ data equality is tested, not assumed.**
-`test_the_schema_tier_enum_matches_the_taxonomy` (tests/test_counts.py:168-171) and
+`test_the_schema_tier_enum_matches_the_taxonomy` (tests/test_counts.py:188-190) and
 `test_the_schema_clause_enum_matches_the_taxonomy` (173-176) assert the enums equal `list(TIERS)`
 and `list(CLAUSES)` as loaded from the data files; `test_the_schema_floor_status_enum_matches_the_validator`
 (178-181) and the floor-severity twin (183-185) pin the same for the validator's tuples;
@@ -184,7 +185,7 @@ where "a match is a prompt to check, not an automatic reject". Top level: `versi
 that the finding survives the clause; for `known_issue` it reads "None"), and
 `suggested_pattern` (all 14
 classes ship one, and `test_every_suggested_pattern_is_in_the_common_dialect`
-tests/test_validate.py:524-530 asserts each compiles in the common dialect).
+tests/test_validate.py:611-617 asserts each compiles in the common dialect).
 
 The fourteen, in file order (id → start line → what it kills, abbreviated):
 
@@ -287,13 +288,13 @@ matched inside a character class.
   accepted. Anything else must compile under `re.IGNORECASE`. A blank pattern, or one with
   surrounding whitespace, is an error in `validate_entry`: viability-gate trims before
   compiling and treats a blank pattern as untested.
-- `load_taxonomies() -> tuple[dict[str, dict], dict[str, dict]]` (140-152) — parses both data
+- `load_taxonomies() -> tuple[dict[str, dict], dict[str, dict]]` (248-260) — parses both data
   files and returns id-keyed maps; exit 2 if either file is missing. This is the function the
   other scripts and the tests import.
-- `entry_validator() -> jsonschema.protocols.Validator` (158-167) — lazily builds a validator for
+- `entry_validator() -> jsonschema.protocols.Validator` (266-275) — lazily builds a validator for
   ONE entry: the schema's `items` plus the top-level `$schema`, with the format checker
-  attached. Cached in `_ENTRY_VALIDATOR` (155).
-- `schema_errors(entry: dict, where: str) -> list[str]` (170-177) — sorted schema findings: iterates `entry_validator().iter_errors`, skips validators in `_SCHEMA_COVERED`,
+  attached. Cached in `_ENTRY_VALIDATOR` (263).
+- `schema_errors(entry: dict, where: str) -> list[str]` (278-285) — sorted schema findings: iterates `entry_validator().iter_errors`, skips validators in `_SCHEMA_COVERED`,
   formats each as `{where}: schema: {path}: {message}`.
 - `validate_entry(...)` (288) — the semantic pass over one entry; returns (errors, warnings).
   Checks, in order: mapping-ness and a slug-shaped `id` (310); JSON Schema on a copy whose YAML
@@ -324,7 +325,7 @@ matched inside a character class.
   prefixed `ERROR `, then a blank line and a per-file and total count line (591-608). JSON mode:
   one object; usage failures (`fail`, 502-507) print `{"ok": false, "error": ..., "exit_code": …}`
   and return the code. The JSON verdict is produced by the same pass as the text verdict — pinned
-  by `test_json_format_is_the_same_verdict_as_text` (tests/test_validate.py:392-398).
+  by `test_json_format_is_the_same_verdict_as_text` (tests/test_validate.py:408-414).
 
 ### scripts/crossref.py (165 lines)
 
@@ -368,29 +369,29 @@ Four scripts CI runs as steps; each is also importable so the tests run the same
   namespace (39-44, 58-61) — so the schema's own `$id` is allowed. Default targets are
   `data/*.yaml` and `schemas/*.json` (46); exit 0 clean / 1 problems / 2 usage (18-21).
 - **[check_hygiene.py](scripts/check_hygiene.py) (260 lines)** — the whole repository, including
-  prose and scripts. `iter_files()` (74-101) lists exactly what git would commit (tracked plus
+  prose and scripts. `iter_files()` (76-103) lists exactly what git would commit (tracked plus
   untracked-not-ignored; falls back to a directory walk skipping `SKIP_DIRS`, 36-46). Three
   working-tree checks plus one history check:
   - `check_encoding`: reads bytes. A leading UTF-8 BOM and a file that is not valid UTF-8 are
     errors (a non-UTF-8 file used to be skipped). Eight mojibake sequences — the UTF-8-as-cp1252
     signatures — are still checked in the decoded text.
-  - `check_tripwires` (122-137): every `TOKENS` hit outside the one allowlisted file.
-  - `check_private` (140-154): six private-path prefixes (59-62).
-  - `check_history` (157-193): re-scans every blob in every commit — "a token deleted in a later
+  - `check_tripwires` (135-150): every `TOKENS` hit outside the one allowlisted file.
+  - `check_private` (153-167): six private-path prefixes (59-62).
+  - `check_history` (170-206): re-scans every blob in every commit — "a token deleted in a later
     commit is still in the history forever" — using the same allowlist. Running it today reports
     20 hits: the platform product name removed in 0.5.0, still present in tags up to and including
     `v0.4.1` (the 0.5.0 changelog records that "Earlier tags still contain the old text; git
     history is not rewritten here", CHANGELOG.md:43). This is why CI runs the script with
     `--no-history` (.github/workflows/ci.yml:68-73): published history is an owner decision, not
     a CI fix.
-  `main` (196-243): `--json`, `--no-history`; exit 0 only when clean.
+  `main` (209-256): `--json`, `--no-history`; exit 0 only when clean.
 - **[check_links.py](scripts/check_links.py) (106 lines)** — every relative link in every
   repository `.md` file resolves. `LINK_RE` (25) extracts markdown links; http(s), mailto and
   pure-fragment targets are ignored (29); a relative target must exist on disk (61-63), and a
   `#fragment` on a `.md` target must match one of its headings under a simplified, best-effort
   slug rule (32-41, 65-73). Exit 0 clean / 1 problems. This is the check this document itself must
   pass.
-- **[check_markdown.py](scripts/check_markdown.py) (89 lines)** — tracked `.md` files render:
+- **[check_markdown.py](scripts/check_markdown.py) (102 lines)** — tracked `.md` files render:
   no line starting with a backtick-at ("a code fence is three backticks", 55-59), no line holding
   a lone backtick (60-64), an even number of ```` fence lines per file (65-67), and every
   `bounty-economics/tree/vX.Y.Z` link in README.md names the version in pyproject.toml (69-77).
@@ -417,14 +418,14 @@ filename (scripts/validate.py:529), so the placeholder-host check warns instead 
   floor; `example-untranscribed` (121) is the load-bearing one — `tier_shape: unknown` +
   `floor_status: unstated` + `floor_severity: null` + `exclusions: []`, "do not hunt until the
   rewards page has been read". `test_the_worked_example_has_one_entry_per_shape`
-  (tests/test_counts.py:51-55) pins the one-entry-per-shape, 5-in-total structure, and
+  (tests/test_counts.py:52-56) pins the one-entry-per-shape, 5-in-total structure, and
   `test_the_unstated_example_keeps_tier_shape_unknown` (85-90) pins entry 5's exact posture.
 
 ## tests/
 
-Six suites, 169 collected tests. Collected counts by file: test_validate.py 99, test_counts.py
+Seven suites, 175 collected tests. Collected counts by file: test_validate.py 99, test_counts.py
 27, test_compat_viability_gate.py 13, test_generic.py 10, test_crossref.py 11, test_token_scan.py
-9. test_validate.py collects 99 cases from 66 functions; the extra cases are the parametrized
+9, test_code_guide.py 6. test_validate.py collects 99 cases from 66 functions; the extra cases are the parametrized
 regex, real-URL and placeholder-host rows.
 
 - **[test_validate.py](tests/test_validate.py) (769 lines, 66 test functions; 99 collected)**
@@ -548,15 +549,15 @@ by design — removing them is a history rewrite, which CHANGELOG.md:43 explicit
 
 ## How this document is verified
 
-Every factual claim above was checked against the 0.6.0 tree:
+Every factual claim above was checked against the 0.6.1 tree:
 
 - Path:line references were written from a full read of every file they cite.
 - Counts were derived by loading the files: 5 tier shapes and 14 clause classes
   (`load_taxonomies()` over data/*.yaml), 12 entry properties, 3 exclusion properties, 4
   prior-audit properties (schemas/ledger.schema.json), 35 identity tokens and 15 platform tokens
-  (scripts/token_scan.py), 5 answered and 10 not-answered gates (data/gate-crossref.yaml),
+  (scripts/token_scan.py), 5 answered and 6 not-answered gates (data/gate-crossref.yaml; 11 total),
   1 + 5 example entries, and the per-suite collected counts (pytest --collect-only per file;
-  169 in total).
+  175 in total).
 - Behaviour claims were exercised: `python scripts/validate.py` on the examples (6 entries, 0
   errors, 10 warnings), `--taxonomy` text and JSON, `crossref.py` for answered, not-answered
   and unknown tokens, the placeholder-host negative case, a clean-venv wheel install run from
