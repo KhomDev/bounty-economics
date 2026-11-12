@@ -1,5 +1,11 @@
 # bounty-economics
 
+> **Archived 2026-11-12 — moved to [priorart](https://github.com/KhomDev/priorart).**
+> The five payout-tier shapes, the fourteen exclusion-clause classes and the gate cross-reference
+> now live in `priorart/vocab/` and are compiled into the `priorart` binary. The ledger JSON Schema
+> stays **v1, unchanged**, and is validated by `priorart ledger validate`. This repository stays
+> readable and its releases stay downloadable; it receives no new work.
+
 **A framework for reading a bug-bounty program's terms before you hunt: payout tiers,
 exclusion-clause classes, and prior-audit surfaces.**
 

@@ -28,6 +28,23 @@ The tree itself is unchanged except for the tripwire fix recorded here.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-12
+
+**Final release. The repository is archived.** The project was consolidated into
+[priorart](https://github.com/KhomDev/priorart) (the renamed viability-gate repository). Nothing in
+this tree is deleted: this release adds a README banner and moves the version, so the migration is
+citable and the archived repository is unambiguously final.
+
+### Changed
+
+- **Moved to priorart/vocab/.** The five payout-tier shapes, the fourteen exclusion-clause classes
+  and the gate cross-reference are compiled into the `priorart` binary and queried with
+  `priorart vocab list` / `priorart vocab show`.
+- **The ledger schema stays v1, byte-identical.** Its validator is now `priorart ledger validate`
+  (a Rust port of `scripts/validate.py`); the Python tests remain the golden reference.
+- The README carries the migration banner; `CODE_GUIDE.md` states the final version. No taxonomy,
+  schema, validator or example behaviour changed in this release.
+
 ## [0.6.1] — 2026-11-10
 
 A self-audit release. The ledger schema stays v1 and no taxonomy, schema, validator or example

@@ -12,8 +12,8 @@ authors:
 license: MIT
 repository-code: "https://github.com/KhomDev/bounty-economics"
 url: "https://github.com/KhomDev/bounty-economics"
-version: "0.6.1"
-date-released: "2026-11-10"
+version: "0.7.0"
+date-released: "2026-11-12"
 keywords:
   - bug-bounty
   - security

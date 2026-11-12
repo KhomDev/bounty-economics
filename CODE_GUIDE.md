@@ -5,7 +5,7 @@ tools; this document explains what every file, field, function, check and test a
 file-and-line references into the tree it describes. Read the README first; read this when you want
 to change something.
 
-**Accuracy pin.** Written against version 0.6.1 (2026-11-10). `python -m pytest tests/ -q -rs`
+**Accuracy pin.** Written against version 0.7.0 (2026-11-12). `python -m pytest tests/ -q -rs`
 collects 175 tests and `python scripts/validate.py --taxonomy` prints 5 tier shapes and 14 clause
 classes. Line numbers refer to that tree and drift as the files change; the identifiers they point
 at are stable in practice. Every count in this document was derived from the files themselves (see
